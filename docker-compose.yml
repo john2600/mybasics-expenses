@@ -1,0 +1,52 @@
+version: "3.9"
+
+services:
+  # ── MySQL database ────────────────────────────────────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: mybasics_expenses_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootsecret
+      MYSQL_DATABASE: mybasics_expenses
+      MYSQL_USER: mybasics_user
+      MYSQL_PASSWORD: secret
+    ports:
+      - "3308:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootsecret"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mybasics_expenses_net
+
+  # ── API server ────────────────────────────────────────────────────────────────
+  api:
+    build: .
+    container_name: mybasics_expenses_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 8081
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: mybasics_user
+      DB_PASSWORD: secret
+      DB_NAME: mybasics_expenses
+    ports:
+      - "8081:8081"
+    networks:
+      - mybasics_expenses_net
+
+networks:
+  mybasics_expenses_net:
+    driver: bridge
+
+volumes:
+  db_data:
