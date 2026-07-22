@@ -77,6 +77,25 @@ siembra categorías base y **ningún movimiento de ejemplo** (empiezas limpio).
 
 ---
 
+## GitHub MCP integration
+
+`.mcp.json` declares the GitHub MCP server that Claude Code uses to operate on
+this repository's issues and pull requests.
+
+The token is **never committed**: the file references `${GITHUB_PERSONAL_ACCESS_TOKEN}`,
+which Claude Code expands from the environment of the shell that launched it.
+Export the real value in your profile (`~/.zshrc`, `~/.bashrc`) before starting
+Claude Code:
+
+```bash
+export GITHUB_PERSONAL_ACCESS_TOKEN="github_pat_..."
+```
+
+A `.env` file will **not** work here: the Go app reads it, but the MCP process
+does not. Verify the connection with `claude mcp list`.
+
+---
+
 ## Endpoints
 
 Base URL: `http://localhost:8080/api/v1`
