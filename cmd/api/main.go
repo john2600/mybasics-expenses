@@ -19,6 +19,7 @@ import (
 	"github.com/jscodelab/mybasics-expenses/internal/movement"
 	"github.com/jscodelab/mybasics-expenses/internal/platform/database"
 	"github.com/jscodelab/mybasics-expenses/internal/reports"
+	"github.com/jscodelab/mybasics-expenses/internal/users"
 	"github.com/jscodelab/mybasics-expenses/pkg/response"
 )
 
@@ -63,6 +64,11 @@ func main() {
 	analyticsService := analytics.NewService(analyticsRepo)
 	analyticsHandler := analytics.NewHandler(analyticsService)
 
+
+	usersRepo := users.NewMySQLRepository(db)
+	usersService := users.NewService(usersRepo)
+	usersHandler := users.NewHandler(usersService)
+
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -86,6 +92,8 @@ func main() {
 		incomesHandler.RegisterRoutes(r)
 		reportsHandler.RegisterRoutes(r)
 		analyticsHandler.RegisterRoutes(r)
+		usersHandler.RegisterRoutes(r)
+
 	})
 
 	addr := fmt.Sprintf(":%s", getEnv("PORT", "8080"))

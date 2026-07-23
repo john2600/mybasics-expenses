@@ -72,6 +72,24 @@ CREATE TABLE IF NOT EXISTS income_config_history (
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------
+-- Table: users
+-- App accounts. Passwords are stored as bcrypt hashes (60 chars),
+-- produced by User.Normalize before insert — never plaintext.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS users (
+    id              BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
+    username        VARCHAR(255)     NOT NULL,
+    name            VARCHAR(255)     NOT NULL,
+    email           VARCHAR(255)     NOT NULL,
+    hashed_password CHAR(60)         NOT NULL,          -- bcrypt hash
+    created_at      DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_users_username (username),
+    UNIQUE KEY uq_users_email    (email)
+) ENGINE=InnoDB;
+
+-- ------------------------------------------------------------
 -- Seed: base categories (Spanish). No movements are seeded.
 -- ------------------------------------------------------------
 INSERT INTO categories (name, description, color) VALUES
