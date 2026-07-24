@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS categories (
 CREATE TABLE IF NOT EXISTS movements (
     id          BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
     category_id BIGINT UNSIGNED  NOT NULL,
+    user_id     BIGINT UNSIGNED  NULL,               -- owner; no FK by design (orphans tolerated)
     type        CHAR(1)          NOT NULL DEFAULT 'E',
     amount      DECIMAL(12, 2)   NOT NULL,
     description TEXT             NOT NULL,
@@ -46,6 +47,7 @@ CREATE TABLE IF NOT EXISTS movements (
     CONSTRAINT chk_movements_type CHECK (type IN ('I', 'E')),
     INDEX idx_movements_date        (date),
     INDEX idx_movements_category_id (category_id),
+    INDEX idx_movements_user_id     (user_id),
     INDEX idx_movements_type        (type),
     CONSTRAINT fk_movements_category
         FOREIGN KEY (category_id) REFERENCES categories (id)
@@ -70,6 +72,37 @@ CREATE TABLE IF NOT EXISTS income_config_history (
     UNIQUE KEY uq_year_month (`year_month`),
     CONSTRAINT chk_ich_cut_day CHECK (cut_day BETWEEN 1 AND 28)
 ) ENGINE=InnoDB;
+
+-- ------------------------------------------------------------
+-- Table: users
+-- App accounts. Passwords are stored as bcrypt hashes (60 chars),
+-- produced by User.Normalize before insert — never plaintext.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS users (
+    id              BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
+    username        VARCHAR(255)     NOT NULL,
+    name            VARCHAR(255)     NOT NULL,
+    email           VARCHAR(255)     NOT NULL,
+    hashed_password CHAR(60)         NOT NULL,          -- bcrypt hash
+    created_at      DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_users_username (username),
+    UNIQUE KEY uq_users_email    (email)
+) ENGINE=InnoDB;
+
+-- ------------------------------------------------------------
+-- Table: sessions
+-- Server-side session store for alexedwards/scs (mysqlstore). Schema is
+-- dictated by the library: token PK, gob-encoded data, expiry for GC.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS sessions (
+    token  CHAR(43)     PRIMARY KEY,
+    data   BLOB         NOT NULL,
+    expiry TIMESTAMP(6) NOT NULL
+) ENGINE=InnoDB;
+
+CREATE INDEX sessions_expiry_idx ON sessions (expiry);
 
 -- ------------------------------------------------------------
 -- Seed: base categories (Spanish). No movements are seeded.

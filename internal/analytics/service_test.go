@@ -19,22 +19,22 @@ type mockRepo struct {
 	iveMonths     []analytics.MonthIVE
 }
 
-func (m *mockRepo) Summary(_ context.Context, _, _ time.Time) (float64, int, []analytics.TrendPoint, error) {
+func (m *mockRepo) Summary(_ context.Context, _ int, _, _ time.Time) (float64, int, []analytics.TrendPoint, error) {
 	return m.summaryTotal, m.summaryCount, m.summaryPoints, nil
 }
-func (m *mockRepo) ByCategory(_ context.Context, _, _ time.Time) ([]analytics.CategoryBreakdown, error) {
+func (m *mockRepo) ByCategory(_ context.Context, _ int, _, _ time.Time) ([]analytics.CategoryBreakdown, error) {
 	return m.categories, nil
 }
-func (m *mockRepo) Trend(_ context.Context, _, _ time.Time) ([]analytics.TrendPoint, error) {
+func (m *mockRepo) Trend(_ context.Context, _ int, _, _ time.Time) ([]analytics.TrendPoint, error) {
 	return m.trendPoints, nil
 }
-func (m *mockRepo) TopExpenses(_ context.Context, _, _ time.Time, limit int) ([]analytics.TopExpense, error) {
+func (m *mockRepo) TopExpenses(_ context.Context, _ int, _, _ time.Time, limit int) ([]analytics.TopExpense, error) {
 	if limit < len(m.topExpenses) {
 		return m.topExpenses[:limit], nil
 	}
 	return m.topExpenses, nil
 }
-func (m *mockRepo) IncomeVsExpense(_ context.Context, _, _ time.Time) ([]analytics.MonthIVE, error) {
+func (m *mockRepo) IncomeVsExpense(_ context.Context, _ int, _, _ time.Time) ([]analytics.MonthIVE, error) {
 	return m.iveMonths, nil
 }
 
@@ -198,7 +198,7 @@ func TestDateRange_ThreeMonths(t *testing.T) {
 	}
 
 	now := time.Now().UTC()
-	expectedFrom := time.Date(now.Year(), now.Month()-2, 1, 0, 0, 0, 0, time.UTC).Format("2006-01-02")
+	expectedFrom := time.Date(now.Year(), now.Month()-2, 1, 0, 0, 0, 0, time.UTC).Format(time.DateOnly)
 	if result.PeriodFrom != expectedFrom {
 		t.Errorf("expected PeriodFrom %s, got %s", expectedFrom, result.PeriodFrom)
 	}

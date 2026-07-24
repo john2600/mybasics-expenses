@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jscodelab/mybasics-expenses/internal/security"
 	"github.com/jscodelab/mybasics-expenses/pkg/response"
 )
 
@@ -41,7 +42,13 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	m, err := h.svc.CreateMovement(r.Context(), req)
+	userID, ok := security.UserID(r.Context())
+	if !ok {
+		response.Unauthorized(w, errors.New("not authenticated"))
+		return
+	}
+
+	m, err := h.svc.CreateMovement(r.Context(), userID, req)
 	if err != nil {
 		response.BadRequest(w, err)
 		return
@@ -58,6 +65,12 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, err)
 		return
 	}
+	userID, ok := security.UserID(r.Context())
+	if !ok {
+		response.Unauthorized(w, errors.New("not authenticated"))
+		return
+	}
+	f.UserID = userID
 
 	grouped, err := h.svc.ListMovements(r.Context(), f)
 	if err != nil {
@@ -81,7 +94,12 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	m, err := h.svc.GetMovement(r.Context(), id)
+	userID, ok := security.UserID(r.Context())
+	if !ok {
+		response.Unauthorized(w, errors.New("not authenticated"))
+		return
+	}
+	m, err := h.svc.GetMovement(r.Context(), userID, id)
 	if err != nil {
 		response.InternalError(w, err)
 		return
@@ -109,7 +127,12 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	m, err := h.svc.UpdateMovement(r.Context(), id, req)
+	userID, ok := security.UserID(r.Context())
+	if !ok {
+		response.Unauthorized(w, errors.New("not authenticated"))
+		return
+	}
+	m, err := h.svc.UpdateMovement(r.Context(), userID, id, req)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			response.NotFound(w, "movement not found")
@@ -135,7 +158,12 @@ func (h *Handler) delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.DeleteMovement(r.Context(), id); err != nil {
+	userID, ok := security.UserID(r.Context())
+	if !ok {
+		response.Unauthorized(w, errors.New("not authenticated"))
+		return
+	}
+	if err := h.svc.DeleteMovement(r.Context(), userID, id); err != nil {
 		if errors.Is(err, ErrNotFound) {
 			response.NotFound(w, "movement not found")
 			return
@@ -155,6 +183,12 @@ func (h *Handler) expenses(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, err)
 		return
 	}
+	userID, ok := security.UserID(r.Context())
+	if !ok {
+		response.Unauthorized(w, errors.New("not authenticated"))
+		return
+	}
+	f.UserID = userID
 
 	list, err := h.svc.ListExpenses(r.Context(), f)
 	if err != nil {
@@ -168,7 +202,12 @@ func (h *Handler) expenses(w http.ResponseWriter, r *http.Request) {
 // summary returns totals grouped by month.
 // GET /api/v1/movements/summary
 func (h *Handler) summary(w http.ResponseWriter, r *http.Request) {
-	summaries, err := h.svc.GetMonthlySummary(r.Context())
+	userID, ok := security.UserID(r.Context())
+	if !ok {
+		response.Unauthorized(w, errors.New("not authenticated"))
+		return
+	}
+	summaries, err := h.svc.GetMonthlySummary(r.Context(), userID)
 	if err != nil {
 		response.InternalError(w, err)
 		return
@@ -212,7 +251,7 @@ func parseFilter(r *http.Request) (Filter, error) {
 	}
 
 	if v := r.URL.Query().Get("date_from"); v != "" {
-		t, err := time.Parse("2006-01-02", v)
+		t, err := time.Parse(time.DateOnly, v)
 		if err != nil {
 			return f, errors.New("invalid date_from, expected YYYY-MM-DD")
 		}
@@ -220,7 +259,7 @@ func parseFilter(r *http.Request) (Filter, error) {
 	}
 
 	if v := r.URL.Query().Get("date_to"); v != "" {
-		t, err := time.Parse("2006-01-02", v)
+		t, err := time.Parse(time.DateOnly, v)
 		if err != nil {
 			return f, errors.New("invalid date_to, expected YYYY-MM-DD")
 		}

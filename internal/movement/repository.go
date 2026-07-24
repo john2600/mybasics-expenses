@@ -7,14 +7,15 @@ import (
 	"strings"
 )
 
-// Repository defines the data access contract for movements.
+// Repository defines the data access contract for movements. Every operation
+// is scoped to a single user via userID (for FindAll it comes from Filter.UserID).
 type Repository interface {
-	Create(ctx context.Context, m *Movement) (*Movement, error)
+	Create(ctx context.Context, userID int, m *Movement) (*Movement, error)
 	FindAll(ctx context.Context, f Filter) ([]Movement, error)
-	FindByID(ctx context.Context, id int64) (*Movement, error)
-	Update(ctx context.Context, id int64, req UpdateRequest) (*Movement, error)
-	Delete(ctx context.Context, id int64) error
-	MonthlySummary(ctx context.Context) ([]MonthlySummary, error)
+	FindByID(ctx context.Context, userID int, id int64) (*Movement, error)
+	Update(ctx context.Context, userID int, id int64, req UpdateRequest) (*Movement, error)
+	Delete(ctx context.Context, userID int, id int64) error
+	MonthlySummary(ctx context.Context, userID int) ([]MonthlySummary, error)
 }
 
 type mysqlRepository struct {
@@ -26,13 +27,13 @@ func NewMySQLRepository(db *sql.DB) Repository {
 	return &mysqlRepository{db: db}
 }
 
-func (r *mysqlRepository) Create(ctx context.Context, m *Movement) (*Movement, error) {
+func (r *mysqlRepository) Create(ctx context.Context, userID int, m *Movement) (*Movement, error) {
 	const q = `
-		INSERT INTO movements (category_id, type, amount, description, date, hour)
-		VALUES (?, ?, ?, ?, ?, ?)`
+		INSERT INTO movements (user_id, category_id, type, amount, description, date, hour)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`
 
 	res, err := r.db.ExecContext(ctx, q,
-		m.CategoryID, m.Type, m.Amount, m.Description, m.Date, m.Hour)
+		userID, m.CategoryID, m.Type, m.Amount, m.Description, m.Date, m.Hour)
 	if err != nil {
 		return nil, fmt.Errorf("inserting movement: %w", err)
 	}
@@ -42,12 +43,12 @@ func (r *mysqlRepository) Create(ctx context.Context, m *Movement) (*Movement, e
 		return nil, fmt.Errorf("getting last insert id: %w", err)
 	}
 
-	return r.FindByID(ctx, id)
+	return r.FindByID(ctx, userID, id)
 }
 
 func (r *mysqlRepository) FindAll(ctx context.Context, f Filter) ([]Movement, error) {
-	var conditions []string
-	var args []any
+	conditions := []string{"m.user_id = ?"}
+	args := []any{f.UserID}
 
 	if f.CategoryID != nil {
 		conditions = append(conditions, "m.category_id = ?")
@@ -109,16 +110,16 @@ func (r *mysqlRepository) FindAll(ctx context.Context, f Filter) ([]Movement, er
 	return movements, rows.Err()
 }
 
-func (r *mysqlRepository) FindByID(ctx context.Context, id int64) (*Movement, error) {
+func (r *mysqlRepository) FindByID(ctx context.Context, userID int, id int64) (*Movement, error) {
 	const q = `
 		SELECT m.id, m.category_id, c.name, m.type, m.amount, m.description, m.date, m.hour, m.created_at, m.updated_at
 		FROM movements m
 		LEFT JOIN categories c ON c.id = m.category_id
-		WHERE m.id = ?`
+		WHERE m.id = ? AND m.user_id = ?`
 
 	var m Movement
 	var hour sql.NullString
-	err := r.db.QueryRowContext(ctx, q, id).Scan(
+	err := r.db.QueryRowContext(ctx, q, id, userID).Scan(
 		&m.ID, &m.CategoryID, &m.Category, &m.Type, &m.Amount,
 		&m.Description, &m.Date, &hour, &m.CreatedAt, &m.UpdatedAt,
 	)
@@ -135,7 +136,7 @@ func (r *mysqlRepository) FindByID(ctx context.Context, id int64) (*Movement, er
 	return &m, nil
 }
 
-func (r *mysqlRepository) Update(ctx context.Context, id int64, req UpdateRequest) (*Movement, error) {
+func (r *mysqlRepository) Update(ctx context.Context, userID int, id int64, req UpdateRequest) (*Movement, error) {
 	var setClauses []string
 	var args []any
 
@@ -165,22 +166,22 @@ func (r *mysqlRepository) Update(ctx context.Context, id int64, req UpdateReques
 	}
 
 	if len(setClauses) == 0 {
-		return r.FindByID(ctx, id)
+		return r.FindByID(ctx, userID, id)
 	}
 
-	args = append(args, id)
-	q := fmt.Sprintf("UPDATE movements SET %s WHERE id = ?", strings.Join(setClauses, ", "))
+	args = append(args, id, userID)
+	q := fmt.Sprintf("UPDATE movements SET %s WHERE id = ? AND user_id = ?", strings.Join(setClauses, ", "))
 
 	if _, err := r.db.ExecContext(ctx, q, args...); err != nil {
 		return nil, fmt.Errorf("updating movement: %w", err)
 	}
 
-	return r.FindByID(ctx, id)
+	return r.FindByID(ctx, userID, id)
 }
 
-func (r *mysqlRepository) Delete(ctx context.Context, id int64) error {
-	const q = `DELETE FROM movements WHERE id = ?`
-	res, err := r.db.ExecContext(ctx, q, id)
+func (r *mysqlRepository) Delete(ctx context.Context, userID int, id int64) error {
+	const q = `DELETE FROM movements WHERE id = ? AND user_id = ?`
+	res, err := r.db.ExecContext(ctx, q, id, userID)
 	if err != nil {
 		return fmt.Errorf("deleting movement: %w", err)
 	}
@@ -196,15 +197,15 @@ func (r *mysqlRepository) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (r *mysqlRepository) MonthlySummary(ctx context.Context) ([]MonthlySummary, error) {
+func (r *mysqlRepository) MonthlySummary(ctx context.Context, userID int) ([]MonthlySummary, error) {
 	const q = `
 		SELECT YEAR(date) AS year, MONTH(date) AS month, SUM(amount) AS total
 		FROM movements
-		WHERE type='E'
+		WHERE type='E' AND user_id = ?
 		GROUP BY YEAR(date), MONTH(date)
 		ORDER BY year DESC, month DESC`
 
-	rows, err := r.db.QueryContext(ctx, q)
+	rows, err := r.db.QueryContext(ctx, q, userID)
 	if err != nil {
 		return nil, fmt.Errorf("querying monthly summary: %w", err)
 	}

@@ -16,7 +16,7 @@ type mockRepository struct {
 	capturedFilter movement.Filter
 }
 
-func (m *mockRepository) Create(_ context.Context, mv *movement.Movement) (*movement.Movement, error) {
+func (m *mockRepository) Create(_ context.Context, _ int, mv *movement.Movement) (*movement.Movement, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -30,7 +30,7 @@ func (m *mockRepository) FindAll(_ context.Context, f movement.Filter) ([]moveme
 	return m.movements, m.err
 }
 
-func (m *mockRepository) FindByID(_ context.Context, id int64) (*movement.Movement, error) {
+func (m *mockRepository) FindByID(_ context.Context, _ int, id int64) (*movement.Movement, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -42,7 +42,7 @@ func (m *mockRepository) FindByID(_ context.Context, id int64) (*movement.Moveme
 	return nil, nil
 }
 
-func (m *mockRepository) Update(_ context.Context, id int64, req movement.UpdateRequest) (*movement.Movement, error) {
+func (m *mockRepository) Update(_ context.Context, _ int, id int64, req movement.UpdateRequest) (*movement.Movement, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -63,7 +63,7 @@ func (m *mockRepository) Update(_ context.Context, id int64, req movement.Update
 	return nil, nil
 }
 
-func (m *mockRepository) Delete(_ context.Context, id int64) error {
+func (m *mockRepository) Delete(_ context.Context, _ int, id int64) error {
 	if m.err != nil {
 		return m.err
 	}
@@ -76,7 +76,7 @@ func (m *mockRepository) Delete(_ context.Context, id int64) error {
 	return movement.ErrNotFound
 }
 
-func (m *mockRepository) MonthlySummary(_ context.Context) ([]movement.MonthlySummary, error) {
+func (m *mockRepository) MonthlySummary(_ context.Context, _ int) ([]movement.MonthlySummary, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -90,7 +90,7 @@ func (m *mockRepository) MonthlySummary(_ context.Context) ([]movement.MonthlySu
 func TestCreateMovement_Success(t *testing.T) {
 	svc := movement.NewService(&mockRepository{})
 
-	m, err := svc.CreateMovement(context.Background(), movement.CreateRequest{
+	m, err := svc.CreateMovement(context.Background(), 1, movement.CreateRequest{
 		CategoryID:  1,
 		Type:        "E",
 		Amount:      50.00,
@@ -111,7 +111,7 @@ func TestCreateMovement_Success(t *testing.T) {
 func TestCreateMovement_DefaultTypeEgreso(t *testing.T) {
 	svc := movement.NewService(&mockRepository{})
 
-	m, err := svc.CreateMovement(context.Background(), movement.CreateRequest{
+	m, err := svc.CreateMovement(context.Background(), 1, movement.CreateRequest{
 		CategoryID:  1,
 		Amount:      10.00,
 		Description: "test",
@@ -129,7 +129,7 @@ func TestCreateMovement_DefaultTypeEgreso(t *testing.T) {
 func TestCreateMovement_Ingreso(t *testing.T) {
 	svc := movement.NewService(&mockRepository{})
 
-	m, err := svc.CreateMovement(context.Background(), movement.CreateRequest{
+	m, err := svc.CreateMovement(context.Background(), 1, movement.CreateRequest{
 		CategoryID:  1,
 		Type:        "I",
 		Amount:      2000.00,
@@ -147,7 +147,7 @@ func TestCreateMovement_Ingreso(t *testing.T) {
 func TestCreateMovement_InvalidType(t *testing.T) {
 	svc := movement.NewService(&mockRepository{})
 
-	_, err := svc.CreateMovement(context.Background(), movement.CreateRequest{
+	_, err := svc.CreateMovement(context.Background(), 1, movement.CreateRequest{
 		CategoryID:  1,
 		Type:        "X",
 		Amount:      10.00,
@@ -162,7 +162,7 @@ func TestCreateMovement_InvalidType(t *testing.T) {
 func TestCreateMovement_InvalidAmount(t *testing.T) {
 	svc := movement.NewService(&mockRepository{})
 
-	_, err := svc.CreateMovement(context.Background(), movement.CreateRequest{
+	_, err := svc.CreateMovement(context.Background(), 1, movement.CreateRequest{
 		CategoryID: 1, Amount: 0, Description: "test", Date: "2026-03-10",
 	})
 	if err == nil {
@@ -173,7 +173,7 @@ func TestCreateMovement_InvalidAmount(t *testing.T) {
 func TestCreateMovement_MissingDescription(t *testing.T) {
 	svc := movement.NewService(&mockRepository{})
 
-	_, err := svc.CreateMovement(context.Background(), movement.CreateRequest{
+	_, err := svc.CreateMovement(context.Background(), 1, movement.CreateRequest{
 		CategoryID: 1, Amount: 10, Description: "", Date: "2026-03-10",
 	})
 	if err == nil {
@@ -184,7 +184,7 @@ func TestCreateMovement_MissingDescription(t *testing.T) {
 func TestCreateMovement_InvalidDate(t *testing.T) {
 	svc := movement.NewService(&mockRepository{})
 
-	_, err := svc.CreateMovement(context.Background(), movement.CreateRequest{
+	_, err := svc.CreateMovement(context.Background(), 1, movement.CreateRequest{
 		CategoryID: 1, Amount: 10, Description: "test", Date: "not-a-date",
 	})
 	if err == nil {
@@ -195,7 +195,7 @@ func TestCreateMovement_InvalidDate(t *testing.T) {
 func TestCreateMovement_MissingCategoryID(t *testing.T) {
 	svc := movement.NewService(&mockRepository{})
 
-	_, err := svc.CreateMovement(context.Background(), movement.CreateRequest{
+	_, err := svc.CreateMovement(context.Background(), 1, movement.CreateRequest{
 		CategoryID: 0, Amount: 10, Description: "test", Date: "2026-03-10",
 	})
 	if err == nil {
@@ -225,7 +225,7 @@ func TestListMovements_GroupedByCategory(t *testing.T) {
 func TestDeleteMovement_NotFound(t *testing.T) {
 	svc := movement.NewService(&mockRepository{})
 
-	err := svc.DeleteMovement(context.Background(), 999)
+	err := svc.DeleteMovement(context.Background(), 1, 999)
 	if !errors.Is(err, movement.ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got %v", err)
 	}
@@ -234,7 +234,7 @@ func TestDeleteMovement_NotFound(t *testing.T) {
 func TestGetMonthlySummary(t *testing.T) {
 	svc := movement.NewService(&mockRepository{})
 
-	summaries, err := svc.GetMonthlySummary(context.Background())
+	summaries, err := svc.GetMonthlySummary(context.Background(), 1)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -252,7 +252,7 @@ func TestUpdateMovement_PartialUpdate(t *testing.T) {
 	}
 	svc := movement.NewService(repo)
 
-	updated, err := svc.UpdateMovement(context.Background(), 1, movement.UpdateRequest{
+	updated, err := svc.UpdateMovement(context.Background(), 1, 1, movement.UpdateRequest{
 		Amount: &newAmount,
 	})
 	if err != nil {
@@ -267,7 +267,7 @@ func TestUpdateMovement_InvalidType(t *testing.T) {
 	invalidType := "X"
 	svc := movement.NewService(&mockRepository{})
 
-	_, err := svc.UpdateMovement(context.Background(), 1, movement.UpdateRequest{
+	_, err := svc.UpdateMovement(context.Background(), 1, 1, movement.UpdateRequest{
 		Type: &invalidType,
 	})
 	if err == nil {

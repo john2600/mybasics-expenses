@@ -27,7 +27,7 @@ func NewService(repo Repository) Service {
 func (s *service) Summary(ctx context.Context, f Filter) (*Summary, error) {
 	from, to := dateRange(f.Months)
 
-	totalSpent, count, points, err := s.repo.Summary(ctx, from, to)
+	totalSpent, count, points, err := s.repo.Summary(ctx, f.UserID, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -44,8 +44,8 @@ func (s *service) Summary(ctx context.Context, f Filter) (*Summary, error) {
 	}
 
 	return &Summary{
-		PeriodFrom:     from.Format("2006-01-02"),
-		PeriodTo:       to.Format("2006-01-02"),
+		PeriodFrom:     from.Format(time.DateOnly),
+		PeriodTo:       to.Format(time.DateOnly),
 		Months:         f.Months,
 		TotalSpent:     totalSpent,
 		MonthlyAverage: monthlyAvg,
@@ -57,7 +57,7 @@ func (s *service) Summary(ctx context.Context, f Filter) (*Summary, error) {
 func (s *service) ByCategory(ctx context.Context, f Filter) (*ByCategory, error) {
 	from, to := dateRange(f.Months)
 
-	cats, err := s.repo.ByCategory(ctx, from, to)
+	cats, err := s.repo.ByCategory(ctx, f.UserID, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -78,8 +78,8 @@ func (s *service) ByCategory(ctx context.Context, f Filter) (*ByCategory, error)
 	}
 
 	return &ByCategory{
-		PeriodFrom: from.Format("2006-01-02"),
-		PeriodTo:   to.Format("2006-01-02"),
+		PeriodFrom: from.Format(time.DateOnly),
+		PeriodTo:   to.Format(time.DateOnly),
 		TotalSpent: total,
 		Categories: cats,
 	}, nil
@@ -88,7 +88,7 @@ func (s *service) ByCategory(ctx context.Context, f Filter) (*ByCategory, error)
 func (s *service) Trend(ctx context.Context, f Filter) (*Trend, error) {
 	from, to := dateRange(f.Months)
 
-	points, err := s.repo.Trend(ctx, from, to)
+	points, err := s.repo.Trend(ctx, f.UserID, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -102,8 +102,8 @@ func (s *service) Trend(ctx context.Context, f Filter) (*Trend, error) {
 	}
 
 	return &Trend{
-		PeriodFrom: from.Format("2006-01-02"),
-		PeriodTo:   to.Format("2006-01-02"),
+		PeriodFrom: from.Format(time.DateOnly),
+		PeriodTo:   to.Format(time.DateOnly),
 		Points:     points,
 	}, nil
 }
@@ -111,7 +111,7 @@ func (s *service) Trend(ctx context.Context, f Filter) (*Trend, error) {
 func (s *service) TopExpenses(ctx context.Context, f Filter, limit int) (*TopExpenses, error) {
 	from, to := dateRange(f.Months)
 
-	expenses, err := s.repo.TopExpenses(ctx, from, to, limit)
+	expenses, err := s.repo.TopExpenses(ctx, f.UserID, from, to, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -121,8 +121,8 @@ func (s *service) TopExpenses(ctx context.Context, f Filter, limit int) (*TopExp
 	}
 
 	return &TopExpenses{
-		PeriodFrom: from.Format("2006-01-02"),
-		PeriodTo:   to.Format("2006-01-02"),
+		PeriodFrom: from.Format(time.DateOnly),
+		PeriodTo:   to.Format(time.DateOnly),
 		Expenses:   expenses,
 	}, nil
 }
@@ -130,7 +130,7 @@ func (s *service) TopExpenses(ctx context.Context, f Filter, limit int) (*TopExp
 func (s *service) IncomeVsExpense(ctx context.Context, f Filter) (*IncomeVsExpense, error) {
 	from, to := dateRange(f.Months)
 
-	months, err := s.repo.IncomeVsExpense(ctx, from, to)
+	months, err := s.repo.IncomeVsExpense(ctx, f.UserID, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -149,8 +149,8 @@ func (s *service) IncomeVsExpense(ctx context.Context, f Filter) (*IncomeVsExpen
 	}
 
 	return &IncomeVsExpense{
-		PeriodFrom: from.Format("2006-01-02"),
-		PeriodTo:   to.Format("2006-01-02"),
+		PeriodFrom: from.Format(time.DateOnly),
+		PeriodTo:   to.Format(time.DateOnly),
 		Months:     months,
 		Totals:     totals,
 	}, nil

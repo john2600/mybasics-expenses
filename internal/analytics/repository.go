@@ -8,12 +8,13 @@ import (
 )
 
 // Repository defines the data access contract for analytics queries.
+// Every query is scoped to a single user via userID.
 type Repository interface {
-	Summary(ctx context.Context, from, to time.Time) (totalSpent float64, count int, points []TrendPoint, err error)
-	ByCategory(ctx context.Context, from, to time.Time) ([]CategoryBreakdown, error)
-	Trend(ctx context.Context, from, to time.Time) ([]TrendPoint, error)
-	TopExpenses(ctx context.Context, from, to time.Time, limit int) ([]TopExpense, error)
-	IncomeVsExpense(ctx context.Context, from, to time.Time) ([]MonthIVE, error)
+	Summary(ctx context.Context, userID int, from, to time.Time) (totalSpent float64, count int, points []TrendPoint, err error)
+	ByCategory(ctx context.Context, userID int, from, to time.Time) ([]CategoryBreakdown, error)
+	Trend(ctx context.Context, userID int, from, to time.Time) ([]TrendPoint, error)
+	TopExpenses(ctx context.Context, userID int, from, to time.Time, limit int) ([]TopExpense, error)
+	IncomeVsExpense(ctx context.Context, userID int, from, to time.Time) ([]MonthIVE, error)
 }
 
 type mysqlRepository struct {
@@ -25,37 +26,37 @@ func NewMySQLRepository(db *sql.DB) Repository {
 	return &mysqlRepository{db: db}
 }
 
-func (r *mysqlRepository) Summary(ctx context.Context, from, to time.Time) (float64, int, []TrendPoint, error) {
+func (r *mysqlRepository) Summary(ctx context.Context, userID int, from, to time.Time) (float64, int, []TrendPoint, error) {
 	// Total spent and expense count.
 	var totalSpent float64
 	var count int
 	err := r.db.QueryRowContext(ctx, `
 		SELECT COALESCE(SUM(amount), 0), COUNT(*)
 		FROM   movements
-		WHERE  type = 'E' AND date BETWEEN ? AND ?`,
-		from.Format("2006-01-02"), to.Format("2006-01-02"),
+		WHERE  user_id = ? AND type = 'E' AND date BETWEEN ? AND ?`,
+		userID, from.Format(time.DateOnly), to.Format(time.DateOnly),
 	).Scan(&totalSpent, &count)
 	if err != nil {
 		return 0, 0, nil, fmt.Errorf("querying summary totals: %w", err)
 	}
 
 	// Monthly breakdown (used for average and peak).
-	points, err := r.Trend(ctx, from, to)
+	points, err := r.Trend(ctx, userID, from, to)
 	if err != nil {
 		return 0, 0, nil, err
 	}
 	return totalSpent, count, points, nil
 }
 
-func (r *mysqlRepository) ByCategory(ctx context.Context, from, to time.Time) ([]CategoryBreakdown, error) {
+func (r *mysqlRepository) ByCategory(ctx context.Context, userID int, from, to time.Time) ([]CategoryBreakdown, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT m.category_id, c.name, SUM(m.amount), COUNT(*)
 		FROM   movements m
 		JOIN   categories c ON c.id = m.category_id
-		WHERE  m.type = 'E' AND m.date BETWEEN ? AND ?
+		WHERE  m.user_id = ? AND m.type = 'E' AND m.date BETWEEN ? AND ?
 		GROUP  BY m.category_id, c.name
 		ORDER  BY SUM(m.amount) DESC`,
-		from.Format("2006-01-02"), to.Format("2006-01-02"),
+		userID, from.Format(time.DateOnly), to.Format(time.DateOnly),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("querying by-category: %w", err)
@@ -73,14 +74,14 @@ func (r *mysqlRepository) ByCategory(ctx context.Context, from, to time.Time) ([
 	return cats, rows.Err()
 }
 
-func (r *mysqlRepository) Trend(ctx context.Context, from, to time.Time) ([]TrendPoint, error) {
+func (r *mysqlRepository) Trend(ctx context.Context, userID int, from, to time.Time) ([]TrendPoint, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT YEAR(date), MONTH(date), SUM(amount), COUNT(*)
 		FROM   movements
-		WHERE  type = 'E' AND date BETWEEN ? AND ?
+		WHERE  user_id = ? AND type = 'E' AND date BETWEEN ? AND ?
 		GROUP  BY YEAR(date), MONTH(date)
 		ORDER  BY YEAR(date), MONTH(date)`,
-		from.Format("2006-01-02"), to.Format("2006-01-02"),
+		userID, from.Format(time.DateOnly), to.Format(time.DateOnly),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("querying trend: %w", err)
@@ -98,15 +99,15 @@ func (r *mysqlRepository) Trend(ctx context.Context, from, to time.Time) ([]Tren
 	return points, rows.Err()
 }
 
-func (r *mysqlRepository) TopExpenses(ctx context.Context, from, to time.Time, limit int) ([]TopExpense, error) {
+func (r *mysqlRepository) TopExpenses(ctx context.Context, userID int, from, to time.Time, limit int) ([]TopExpense, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT m.id, m.date, c.name, m.description, m.amount
 		FROM   movements m
 		JOIN   categories c ON c.id = m.category_id
-		WHERE  m.type = 'E' AND m.date BETWEEN ? AND ?
+		WHERE  m.user_id = ? AND m.type = 'E' AND m.date BETWEEN ? AND ?
 		ORDER  BY m.amount DESC
 		LIMIT  ?`,
-		from.Format("2006-01-02"), to.Format("2006-01-02"), limit,
+		userID, from.Format(time.DateOnly), to.Format(time.DateOnly), limit,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("querying top expenses: %w", err)
@@ -120,23 +121,23 @@ func (r *mysqlRepository) TopExpenses(ctx context.Context, from, to time.Time, l
 		if err := rows.Scan(&e.ID, &date, &e.Category, &e.Description, &e.Amount); err != nil {
 			return nil, fmt.Errorf("scanning top expense row: %w", err)
 		}
-		e.Date = date.Format("2006-01-02")
+		e.Date = date.Format(time.DateOnly)
 		expenses = append(expenses, e)
 	}
 	return expenses, rows.Err()
 }
 
-func (r *mysqlRepository) IncomeVsExpense(ctx context.Context, from, to time.Time) ([]MonthIVE, error) {
+func (r *mysqlRepository) IncomeVsExpense(ctx context.Context, userID int, from, to time.Time) ([]MonthIVE, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT
 		  YEAR(date), MONTH(date),
 		  SUM(CASE WHEN type = 'I' THEN amount ELSE 0 END),
 		  SUM(CASE WHEN type = 'E' THEN amount ELSE 0 END)
 		FROM   movements
-		WHERE  date BETWEEN ? AND ?
+		WHERE  user_id = ? AND date BETWEEN ? AND ?
 		GROUP  BY YEAR(date), MONTH(date)
 		ORDER  BY YEAR(date), MONTH(date)`,
-		from.Format("2006-01-02"), to.Format("2006-01-02"),
+		userID, from.Format(time.DateOnly), to.Format(time.DateOnly),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("querying income-vs-expense: %w", err)

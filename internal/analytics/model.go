@@ -3,6 +3,8 @@ package analytics
 // Filter holds common query parameters for analytics endpoints.
 type Filter struct {
 	Months int
+	// UserID scopes every analytics query to a single user's movements.
+	UserID int
 }
 
 // PeakMonth holds the month with the highest spend.

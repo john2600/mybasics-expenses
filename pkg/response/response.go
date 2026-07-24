@@ -40,6 +40,11 @@ func BadRequest(w http.ResponseWriter, err error) {
 	JSON(w, http.StatusBadRequest, Envelope{Error: err.Error()})
 }
 
+// Unauthorized writes a 401 JSON error response.
+func Unauthorized(w http.ResponseWriter, err error) {
+	JSON(w, http.StatusUnauthorized, Envelope{Error: err.Error()})
+}
+
 // NotFound writes a 404 JSON error response.
 func NotFound(w http.ResponseWriter, msg string) {
 	JSON(w, http.StatusNotFound, Envelope{Error: msg})
