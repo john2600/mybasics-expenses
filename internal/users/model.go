@@ -29,6 +29,21 @@ type User struct {
 	Updated        time.Time
 }
 
+
+func (u *User) ComparePassword(hashedPassword []byte) error {
+	err := bcrypt.CompareHashAndPassword(hashedPassword, []byte(u.Password))
+	if err != nil {
+		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+			return ErrInvalidCredentials
+		} 
+		return err
+		
+	}
+
+	return nil
+}
+
+
 // Normalize cleans up the user's fields and hashes the plaintext password into
 // HashedPassword. It must be called before persisting the user. bcrypt can
 // fail, so the error is propagated.
@@ -52,6 +67,12 @@ func (u *User) Normalize() error {
 type UserRequest struct {
 	UserName string `json:"username"`
 	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+// LoginRequest is the payload for authenticating an existing user.
+type LoginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
@@ -89,3 +110,4 @@ func (u *UserRequest) Validate() error {
 
 	return nil
 }
+

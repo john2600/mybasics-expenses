@@ -10,6 +10,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
+	"github.com/alexedwards/scs/mysqlstore" // New import
+	"github.com/alexedwards/scs/v2"
 	"github.com/joho/godotenv"
 
 	"github.com/jscodelab/mybasics-expenses/internal/analytics"
@@ -19,6 +22,7 @@ import (
 	"github.com/jscodelab/mybasics-expenses/internal/movement"
 	"github.com/jscodelab/mybasics-expenses/internal/platform/database"
 	"github.com/jscodelab/mybasics-expenses/internal/reports"
+	"github.com/jscodelab/mybasics-expenses/internal/security"
 	"github.com/jscodelab/mybasics-expenses/internal/users"
 	"github.com/jscodelab/mybasics-expenses/pkg/response"
 )
@@ -38,6 +42,10 @@ func main() {
 		log.Fatalf("connecting to database: %v", err)
 	}
 	defer db.Close()
+
+	sessionManager := scs.New()
+	sessionManager.Store = mysqlstore.New(db)
+	sessionManager.Lifetime = 12 * time.Hour
 
 	// Wire up repositories → services → handlers.
 	categoryRepo := category.NewMySQLRepository(db)
@@ -64,15 +72,15 @@ func main() {
 	analyticsService := analytics.NewService(analyticsRepo)
 	analyticsHandler := analytics.NewHandler(analyticsService)
 
-
 	usersRepo := users.NewMySQLRepository(db)
 	usersService := users.NewService(usersRepo)
-	usersHandler := users.NewHandler(usersService)
+	usersHandler := users.NewHandler(usersService, sessionManager)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RequestID)
+	r.Use(sessionManager.LoadAndSave)
 	r.Use(corsMiddleware)
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -85,15 +93,21 @@ func main() {
 		response.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
+	protect := security.NewHandler(sessionManager)
+
 	r.Route("/api/v1", func(r chi.Router) {
-		categoryHandler.RegisterRoutes(r)
-		movementHandler.RegisterRoutes(r)
-		balanceHandler.RegisterRoutes(r)
-		incomesHandler.RegisterRoutes(r)
-		reportsHandler.RegisterRoutes(r)
-		analyticsHandler.RegisterRoutes(r)
 		usersHandler.RegisterRoutes(r)
 
+		// protegidas
+		r.Group(func(r chi.Router) {
+			r.Use(protect.RestrictEndpoint) // ← el middleware aquí
+			movementHandler.RegisterRoutes(r)
+			balanceHandler.RegisterRoutes(r)
+			analyticsHandler.RegisterRoutes(r)
+			reportsHandler.RegisterRoutes(r)
+			incomesHandler.RegisterRoutes(r)
+			categoryHandler.RegisterRoutes(r)
+		})
 	})
 
 	addr := fmt.Sprintf(":%s", getEnv("PORT", "8080"))

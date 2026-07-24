@@ -8,12 +8,10 @@ import (
 	"github.com/jscodelab/mybasics-expenses/internal/incomes"
 )
 
-const dateLayout = "2006-01-02"
-
 // Service handles balance business logic.
 type Service interface {
-	GetBalance(ctx context.Context, dateFrom, dateTo string) (*Summary, error)
-	GetPeriods(ctx context.Context) ([]PeriodSummary, error)
+	GetBalance(ctx context.Context, userID int, dateFrom, dateTo string) (*Summary, error)
+	GetPeriods(ctx context.Context, userID int) ([]PeriodSummary, error)
 }
 
 type service struct {
@@ -26,7 +24,7 @@ func NewService(repo Repository, incomesRepo incomes.Repository) Service {
 	return &service{repo: repo, incomesRepo: incomesRepo}
 }
 
-func (s *service) GetBalance(ctx context.Context, dateFrom, dateTo string) (*Summary, error) {
+func (s *service) GetBalance(ctx context.Context, userID int, dateFrom, dateTo string) (*Summary, error) {
 	from, err := parseDate(dateFrom)
 	if err != nil {
 		return nil, fmt.Errorf("invalid date_from: %w", err)
@@ -47,7 +45,7 @@ func (s *service) GetBalance(ctx context.Context, dateFrom, dateTo string) (*Sum
 		return nil, fmt.Errorf("fetching income config: %w", err)
 	}
 
-	summary, err := s.repo.GetSummary(ctx, from, to)
+	summary, err := s.repo.GetSummary(ctx, userID, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +72,7 @@ func (s *service) GetBalance(ctx context.Context, dateFrom, dateTo string) (*Sum
 		return nil, fmt.Errorf("fetching prev income config: %w", err)
 	}
 
-	prevExpenses, prevIncomes, err := s.repo.GetPeriodSummary(ctx, prevFrom, prevTo)
+	prevExpenses, prevIncomes, err := s.repo.GetPeriodSummary(ctx, userID, prevFrom, prevTo)
 	if err != nil {
 		return nil, fmt.Errorf("fetching previous period: %w", err)
 	}
@@ -87,14 +85,14 @@ func (s *service) GetBalance(ctx context.Context, dateFrom, dateTo string) (*Sum
 	return summary, nil
 }
 
-func (s *service) GetPeriods(ctx context.Context) ([]PeriodSummary, error) {
+func (s *service) GetPeriods(ctx context.Context, userID int) ([]PeriodSummary, error) {
 	// Latest config drives the cut_day used to build period boundaries.
 	latestCfg, err := s.incomesRepo.Get(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("fetching income config: %w", err)
 	}
 
-	earliest, err := s.repo.GetEarliestMovementDate(ctx)
+	earliest, err := s.repo.GetEarliestMovementDate(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("fetching earliest movement date: %w", err)
 	}
@@ -119,9 +117,9 @@ func (s *service) GetPeriods(ctx context.Context) ([]PeriodSummary, error) {
 			return nil, fmt.Errorf("fetching config for period %s: %w", start.Format("2006-01"), err)
 		}
 
-		expenses, regIncomes, err := s.repo.GetPeriodSummary(ctx, start, end)
+		expenses, regIncomes, err := s.repo.GetPeriodSummary(ctx, userID, start, end)
 		if err != nil {
-			return nil, fmt.Errorf("querying period %s: %w", start.Format("2006-01-02"), err)
+			return nil, fmt.Errorf("querying period %s: %w", start.Format(time.DateOnly), err)
 		}
 
 		totalIncome := cfg.Amount + regIncomes
@@ -181,7 +179,7 @@ func parseDate(s string) (*time.Time, error) {
 	if s == "" {
 		return nil, nil
 	}
-	t, err := time.Parse(dateLayout, s)
+	t, err := time.Parse(time.DateOnly, s)
 	if err != nil {
 		return nil, fmt.Errorf("expected YYYY-MM-DD, got %q", s)
 	}

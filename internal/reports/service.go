@@ -52,8 +52,8 @@ func (s *service) Export(ctx context.Context, f ExportFilter) (*ExportReport, er
 	}
 
 	return &ExportReport{
-		PeriodFrom:     from.Format("2006-01-02"),
-		PeriodTo:       to.Format("2006-01-02"),
+		PeriodFrom:     from.Format(time.DateOnly),
+		PeriodTo:       to.Format(time.DateOnly),
 		Total:          total,
 		MonthlySummary: summary,
 		Expenses:       expenses,

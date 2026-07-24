@@ -1,5 +1,6 @@
 .env
 bin/
+/api
 *.out
 .DS_Store
 .claude/

@@ -30,7 +30,7 @@ func (r *mysqlRepository) QueryExpenses(ctx context.Context, from, to time.Time)
 		WHERE  m.type = 'E' AND m.date BETWEEN ? AND ?
 		ORDER  BY m.date DESC`
 
-	rows, err := r.db.QueryContext(ctx, q, from.Format("2006-01-02"), to.Format("2006-01-02"))
+	rows, err := r.db.QueryContext(ctx, q, from.Format(time.DateOnly), to.Format(time.DateOnly))
 	if err != nil {
 		return nil, fmt.Errorf("querying expenses for export: %w", err)
 	}
@@ -43,7 +43,7 @@ func (r *mysqlRepository) QueryExpenses(ctx context.Context, from, to time.Time)
 		if err := rows.Scan(&e.ID, &date, &e.Category, &e.Description, &e.Amount); err != nil {
 			return nil, fmt.Errorf("scanning expense row: %w", err)
 		}
-		e.Date = date.Format("2006-01-02")
+		e.Date = date.Format(time.DateOnly)
 		expenses = append(expenses, e)
 	}
 	return expenses, rows.Err()
@@ -57,7 +57,7 @@ func (r *mysqlRepository) MonthlySummary(ctx context.Context, from, to time.Time
 		GROUP  BY YEAR(date), MONTH(date)
 		ORDER  BY YEAR(date), MONTH(date)`
 
-	rows, err := r.db.QueryContext(ctx, q, from.Format("2006-01-02"), to.Format("2006-01-02"))
+	rows, err := r.db.QueryContext(ctx, q, from.Format(time.DateOnly), to.Format(time.DateOnly))
 	if err != nil {
 		return nil, fmt.Errorf("querying monthly summary: %w", err)
 	}

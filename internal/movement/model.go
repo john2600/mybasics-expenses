@@ -38,6 +38,7 @@ type UpdateRequest struct {
 
 // Filter holds query parameters for listing movements.
 type Filter struct {
+	UserID     int // owner scope; set by the handler, not from client input
 	CategoryID *int64
 	Type       *string
 	DateFrom   *time.Time

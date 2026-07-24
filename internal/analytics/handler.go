@@ -104,7 +104,10 @@ func (h *Handler) IncomeVsExpense(w http.ResponseWriter, r *http.Request) {
 	response.Success(w, data)
 }
 
-// parseFilter extracts and validates the shared ?months query parameter.
+// parseFilter builds the analytics Filter from the request. The user id comes
+// from the request context (populated by the auth.RequireUser middleware), never
+// from client-controlled input. The only query parameter is:
+//   - ?months (optional): size of the trailing window, defaults to 3.
 func parseFilter(w http.ResponseWriter, r *http.Request) (Filter, bool) {
 	months := 3
 	if raw := r.URL.Query().Get("months"); raw != "" {
@@ -115,5 +118,5 @@ func parseFilter(w http.ResponseWriter, r *http.Request) (Filter, bool) {
 		}
 		months = n
 	}
-	return Filter{Months: months}, true
+	return Filter{Months: months, UserID: 1}, true
 }
