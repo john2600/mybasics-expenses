@@ -42,7 +42,11 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, _ := security.UserID(r.Context())
+	userID, ok := security.UserID(r.Context())
+	if !ok {
+		response.Unauthorized(w, errors.New("not authenticated"))
+		return
+	}
 
 	m, err := h.svc.CreateMovement(r.Context(), userID, req)
 	if err != nil {
@@ -61,7 +65,11 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, err)
 		return
 	}
-	userID, _ := security.UserID(r.Context())
+	userID, ok := security.UserID(r.Context())
+	if !ok {
+		response.Unauthorized(w, errors.New("not authenticated"))
+		return
+	}
 	f.UserID = userID
 
 	grouped, err := h.svc.ListMovements(r.Context(), f)
@@ -86,7 +94,11 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, _ := security.UserID(r.Context())
+	userID, ok := security.UserID(r.Context())
+	if !ok {
+		response.Unauthorized(w, errors.New("not authenticated"))
+		return
+	}
 	m, err := h.svc.GetMovement(r.Context(), userID, id)
 	if err != nil {
 		response.InternalError(w, err)
@@ -115,7 +127,11 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, _ := security.UserID(r.Context())
+	userID, ok := security.UserID(r.Context())
+	if !ok {
+		response.Unauthorized(w, errors.New("not authenticated"))
+		return
+	}
 	m, err := h.svc.UpdateMovement(r.Context(), userID, id, req)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
@@ -142,7 +158,11 @@ func (h *Handler) delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, _ := security.UserID(r.Context())
+	userID, ok := security.UserID(r.Context())
+	if !ok {
+		response.Unauthorized(w, errors.New("not authenticated"))
+		return
+	}
 	if err := h.svc.DeleteMovement(r.Context(), userID, id); err != nil {
 		if errors.Is(err, ErrNotFound) {
 			response.NotFound(w, "movement not found")
@@ -163,7 +183,11 @@ func (h *Handler) expenses(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, err)
 		return
 	}
-	userID, _ := security.UserID(r.Context())
+	userID, ok := security.UserID(r.Context())
+	if !ok {
+		response.Unauthorized(w, errors.New("not authenticated"))
+		return
+	}
 	f.UserID = userID
 
 	list, err := h.svc.ListExpenses(r.Context(), f)
@@ -178,7 +202,11 @@ func (h *Handler) expenses(w http.ResponseWriter, r *http.Request) {
 // summary returns totals grouped by month.
 // GET /api/v1/movements/summary
 func (h *Handler) summary(w http.ResponseWriter, r *http.Request) {
-	userID, _ := security.UserID(r.Context())
+	userID, ok := security.UserID(r.Context())
+	if !ok {
+		response.Unauthorized(w, errors.New("not authenticated"))
+		return
+	}
 	summaries, err := h.svc.GetMonthlySummary(r.Context(), userID)
 	if err != nil {
 		response.InternalError(w, err)
