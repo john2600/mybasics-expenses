@@ -39,6 +39,177 @@ mybasics-expenses/
 
 ---
 
+## Architecture diagrams
+
+### 1. Component overview
+
+```mermaid
+flowchart LR
+    Client["Client<br/>curl · web · mobile"]
+
+    subgraph Process["API process — cmd/api/main.go"]
+        direction TB
+        Router["chi Router<br/>Logger · Recoverer · RequestID · CORS"]
+        Health["GET /health<br/>db.PingContext"]
+
+        subgraph Modules["internal/ modules — base /api/v1"]
+            direction LR
+            Cat["category"]
+            Mov["movement"]
+            Inc["incomes"]
+            Bal["balance"]
+            Rep["reports"]
+            Ana["analytics"]
+        end
+
+        Resp["pkg/response<br/>Envelope{Data, Error, Message}"]
+        Pool["internal/platform/database<br/>MySQL pool — 25 open / 10 idle"]
+    end
+
+    DB[("MySQL 8.0<br/>categories · movements<br/>income_config_history")]
+
+    Client -- "HTTP + JSON" --> Router
+    Router --> Health
+    Router -- "RegisterRoutes" --> Modules
+    Modules --> Resp
+    Resp -- "JSON envelope" --> Client
+    Modules --> Pool
+    Health --> Pool
+    Pool -- "database/sql" --> DB
+```
+
+### 2. Layered pattern inside a module
+
+Every module under `internal/` repeats the same three layers, and each layer is
+defined as an interface so the layer above can be unit-tested with a mock.
+
+```mermaid
+flowchart LR
+    Req["HTTP request"] --> H
+
+    subgraph Module["internal/&lt;module&gt;"]
+        direction TB
+        H["handler.go<br/>decode request · map errors to status"]
+        S["service.go<br/>validation · business rules"]
+        R["repository.go<br/>SQL via database/sql"]
+        M["model.go<br/>domain structs"]
+        E["errors.go<br/>ErrNotFound"]
+
+        H -- "Service interface" --> S
+        S -- "Repository interface" --> R
+        S -.-> E
+        E -.-> H
+        R -.-> M
+        M -.-> H
+    end
+
+    R --> DB[("MySQL")]
+    H --> Resp["pkg/response<br/>Success · Created · NotFound"]
+```
+
+### 3. Request lifecycle — `POST /api/v1/movements`
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant R as chi Router
+    participant H as movement.Handler
+    participant S as movement.Service
+    participant Repo as movement.Repository
+    participant DB as MySQL
+
+    C->>R: POST /api/v1/movements (JSON)
+    R->>H: middleware chain, then route
+    H->>H: decode body into CreateRequest
+    H->>S: CreateMovement(ctx, req)
+    S->>S: validate amount > 0, description, category_id, type I/E
+    S->>Repo: Create(ctx, movement)
+    Repo->>DB: INSERT INTO movements ...
+    DB-->>Repo: id
+    Repo-->>S: *Movement
+    S-->>H: *Movement
+    H->>C: 201 Created · Envelope{Data: movement}
+
+    Note over S,H: on ErrNotFound the handler answers 404,<br/>on validation errors 400
+```
+
+### 4. Module dependencies and data flow
+
+`movements` is the single source of truth: `balance`, `reports` and `analytics`
+never write, they only aggregate what the user recorded manually.
+
+```mermaid
+flowchart TD
+    User["User — manual entry"]
+
+    User --> CatM["category<br/>CRUD"]
+    User --> MovM["movement<br/>CRUD income I / expense E"]
+    User --> IncM["incomes<br/>fixed monthly income"]
+
+    CatM --> TCat[("categories")]
+    MovM --> TMov[("movements")]
+    IncM --> TInc[("income_config_history")]
+
+    TCat -- "FK category_id" --> TMov
+
+    TMov --> BalM["balance<br/>available balance · billing periods"]
+    TInc --> BalM
+    TMov --> RepM["reports<br/>export JSON / CSV / PDF"]
+    TMov --> AnaM["analytics<br/>summary · by-category · trend<br/>top-expenses · income-vs-expense"]
+
+    BalM --> Out["Read-only responses"]
+    RepM --> Out
+    AnaM --> Out
+```
+
+> `balance` is the only module wired with two repositories: its own plus
+> `incomes`, because the available balance needs the fixed income and its cut day
+> (see the wiring in `cmd/api/main.go`).
+
+### 5. Data model
+
+```mermaid
+erDiagram
+    categories ||--o{ movements : "classifies"
+
+    categories {
+        bigint id PK
+        varchar name UK
+        varchar description
+        varchar color "hex, for UI"
+        datetime created_at
+        datetime updated_at
+    }
+
+    movements {
+        bigint id PK
+        bigint category_id FK "ON DELETE RESTRICT"
+        char type "I = income, E = expense"
+        decimal amount
+        text description
+        date date
+        time hour "nullable"
+        datetime created_at
+        datetime updated_at
+    }
+
+    income_config_history {
+        int id PK
+        date year_month UK "first day of month"
+        decimal amount
+        tinyint cut_day "1..28, default 24"
+        varchar description
+        datetime created_at
+    }
+```
+
+`income_config_history` is versioned rather than updated in place: each row is
+valid from its `year_month` forward until a newer row exists, so past balances
+stay reproducible.
+
+---
+
 ## Puesta en marcha
 
 ### Opción A — Local
