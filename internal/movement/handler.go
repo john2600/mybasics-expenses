@@ -8,13 +8,9 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jscodelab/mybasics-expenses/internal/security"
 	"github.com/jscodelab/mybasics-expenses/pkg/response"
 )
-
-// currentUserID is a temporary hardcoded user id, threaded down to the query
-// layer so movements are scoped to (and created for) a single user.
-// TODO: replace with the authenticated user once auth is wired in.
-const currentUserID = 1
 
 // Handler handles HTTP requests for movements.
 type Handler struct {
@@ -46,7 +42,9 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	m, err := h.svc.CreateMovement(r.Context(), currentUserID, req)
+	userID, _ := security.UserID(r.Context())
+
+	m, err := h.svc.CreateMovement(r.Context(), userID, req)
 	if err != nil {
 		response.BadRequest(w, err)
 		return
@@ -63,7 +61,8 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, err)
 		return
 	}
-	f.UserID = currentUserID
+	userID, _ := security.UserID(r.Context())
+	f.UserID = userID
 
 	grouped, err := h.svc.ListMovements(r.Context(), f)
 	if err != nil {
@@ -87,7 +86,8 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	m, err := h.svc.GetMovement(r.Context(), currentUserID, id)
+	userID, _ := security.UserID(r.Context())
+	m, err := h.svc.GetMovement(r.Context(), userID, id)
 	if err != nil {
 		response.InternalError(w, err)
 		return
@@ -115,7 +115,8 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	m, err := h.svc.UpdateMovement(r.Context(), currentUserID, id, req)
+	userID, _ := security.UserID(r.Context())
+	m, err := h.svc.UpdateMovement(r.Context(), userID, id, req)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			response.NotFound(w, "movement not found")
@@ -141,7 +142,8 @@ func (h *Handler) delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.DeleteMovement(r.Context(), currentUserID, id); err != nil {
+	userID, _ := security.UserID(r.Context())
+	if err := h.svc.DeleteMovement(r.Context(), userID, id); err != nil {
 		if errors.Is(err, ErrNotFound) {
 			response.NotFound(w, "movement not found")
 			return
@@ -161,7 +163,8 @@ func (h *Handler) expenses(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, err)
 		return
 	}
-	f.UserID = currentUserID
+	userID, _ := security.UserID(r.Context())
+	f.UserID = userID
 
 	list, err := h.svc.ListExpenses(r.Context(), f)
 	if err != nil {
@@ -175,7 +178,8 @@ func (h *Handler) expenses(w http.ResponseWriter, r *http.Request) {
 // summary returns totals grouped by month.
 // GET /api/v1/movements/summary
 func (h *Handler) summary(w http.ResponseWriter, r *http.Request) {
-	summaries, err := h.svc.GetMonthlySummary(r.Context(), currentUserID)
+	userID, _ := security.UserID(r.Context())
+	summaries, err := h.svc.GetMonthlySummary(r.Context(), userID)
 	if err != nil {
 		response.InternalError(w, err)
 		return

@@ -5,13 +5,9 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jscodelab/mybasics-expenses/internal/security"
 	"github.com/jscodelab/mybasics-expenses/pkg/response"
 )
-
-// currentUserID is a temporary hardcoded user id, threaded down to the query
-// layer so results are scoped to a single user. TODO: replace with the
-// authenticated user once auth is wired in.
-const currentUserID = 1
 
 // Handler handles HTTP requests for balance.
 type Handler struct {
@@ -35,7 +31,8 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 	dateFrom := r.URL.Query().Get("date_from")
 	dateTo := r.URL.Query().Get("date_to")
 
-	summary, err := h.svc.GetBalance(r.Context(), currentUserID, dateFrom, dateTo)
+	userID, _ := security.UserID(r.Context())
+	summary, err := h.svc.GetBalance(r.Context(), userID, dateFrom, dateTo)
 	if err != nil {
 		if isDateError(err) {
 			response.BadRequest(w, err)
@@ -51,7 +48,8 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 // periods returns the carry-over balance per billing period.
 // GET /api/v1/balance/periods
 func (h *Handler) periods(w http.ResponseWriter, r *http.Request) {
-	periods, err := h.svc.GetPeriods(r.Context(), currentUserID)
+	userID, _ := security.UserID(r.Context())
+	periods, err := h.svc.GetPeriods(r.Context(), userID)
 	if err != nil {
 		response.InternalError(w, err)
 		return

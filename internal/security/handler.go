@@ -5,10 +5,11 @@ import (
 	"log"
 	"net/http"
 
+	"context"
+
 	"github.com/alexedwards/scs/v2"
 	"github.com/jscodelab/mybasics-expenses/pkg/response"
 )
-
 
 type Security struct {
 	SessionManager *scs.SessionManager
@@ -32,11 +33,24 @@ func (app *Security) RestrictEndpoint(next http.Handler) http.Handler {
 		userID := app.SessionManager.GetInt(r.Context(), "authenticatedUserID")
 		log.Printf("security: allowing %s %s for userID=%d", r.Method, r.URL.Path, userID)
 
+		// Setting a value
+		ctx := context.WithValue(r.Context(), userIDKey, userID)
+		req := r.WithContext(ctx)
+
 		w.Header().Add("Cache-Control", "no-store")
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(w, req)
 	})
 }
 
 func (s *Security) isAuthenticated(r *http.Request) bool {
 	return s.SessionManager.Exists(r.Context(), "authenticatedUserID")
+}
+
+type contextKey string
+
+const userIDKey contextKey = "userID"
+
+func UserID(ctx context.Context) (int, bool) {
+	id, ok := ctx.Value(userIDKey).(int)
+	return id, ok
 }
