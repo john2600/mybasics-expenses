@@ -56,7 +56,7 @@ func TestExport_PeriodFrom_SingleMonth(t *testing.T) {
 	}
 
 	now := time.Now().UTC()
-	expectedFrom := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC).Format("2006-01-02")
+	expectedFrom := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC).Format(time.DateOnly)
 	if report.PeriodFrom != expectedFrom {
 		t.Errorf("expected PeriodFrom %s, got %s", expectedFrom, report.PeriodFrom)
 	}

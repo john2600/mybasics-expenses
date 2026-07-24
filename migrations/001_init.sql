@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS categories (
 CREATE TABLE IF NOT EXISTS movements (
     id          BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
     category_id BIGINT UNSIGNED  NOT NULL,
+    user_id     BIGINT UNSIGNED  NULL,               -- owner; no FK by design (orphans tolerated)
     type        CHAR(1)          NOT NULL DEFAULT 'E',
     amount      DECIMAL(12, 2)   NOT NULL,
     description TEXT             NOT NULL,
@@ -46,6 +47,7 @@ CREATE TABLE IF NOT EXISTS movements (
     CONSTRAINT chk_movements_type CHECK (type IN ('I', 'E')),
     INDEX idx_movements_date        (date),
     INDEX idx_movements_category_id (category_id),
+    INDEX idx_movements_user_id     (user_id),
     INDEX idx_movements_type        (type),
     CONSTRAINT fk_movements_category
         FOREIGN KEY (category_id) REFERENCES categories (id)
@@ -88,6 +90,19 @@ CREATE TABLE IF NOT EXISTS users (
     UNIQUE KEY uq_users_username (username),
     UNIQUE KEY uq_users_email    (email)
 ) ENGINE=InnoDB;
+
+-- ------------------------------------------------------------
+-- Table: sessions
+-- Server-side session store for alexedwards/scs (mysqlstore). Schema is
+-- dictated by the library: token PK, gob-encoded data, expiry for GC.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS sessions (
+    token  CHAR(43)     PRIMARY KEY,
+    data   BLOB         NOT NULL,
+    expiry TIMESTAMP(6) NOT NULL
+) ENGINE=InnoDB;
+
+CREATE INDEX sessions_expiry_idx ON sessions (expiry);
 
 -- ------------------------------------------------------------
 -- Seed: base categories (Spanish). No movements are seeded.

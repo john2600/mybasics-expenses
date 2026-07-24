@@ -2,25 +2,31 @@ package users
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
+	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/jscodelab/mybasics-expenses/pkg/response"
 )
 
-// Handler handles HTTP requests for movements.
+// Handler handles HTTP requests for users.
 type Handler struct {
 	svc Service
+	// sm writes the authenticated user id into the session on login. It is the
+	// only place in the user handler that touches session state.
+	sm *scs.SessionManager
 }
 
-// NewHandler creates a new movement Handler.
-func NewHandler(svc Service) *Handler {
-	return &Handler{svc: svc}
+// NewHandler creates a new users Handler.
+func NewHandler(svc Service, sm *scs.SessionManager) *Handler {
+	return &Handler{svc: svc, sm: sm}
 }
 
-// RegisterRoutes registers movement routes under the given router.
+// RegisterRoutes registers user routes under the given router.
 func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Post("/user", h.create)
+	r.Post("/user/login", h.login)
 }
 
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
@@ -37,4 +43,36 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.Created(w, "user created")
+}
+
+// login authenticates a user and stores their id in the session.
+// POST /api/v1/user/login
+func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
+	var req LoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.BadRequest(w, err)
+		return
+	}
+
+	id, err := h.svc.Authenticate(r.Context(), req.Email, req.Password)
+	if err != nil {
+		if errors.Is(err, ErrInvalidCredentials) {
+			response.Unauthorized(w, errors.New("invalid email or password"))
+			return
+		}
+		response.InternalError(w, err)
+		return
+	}
+
+	// Renew the session token on login to prevent session fixation, then store
+	// the authenticated user id. The rest of the app reads it from the session
+	// (via the security middleware), never from the request body.
+	if err := h.sm.RenewToken(r.Context()); err != nil {
+		response.InternalError(w, err)
+		return
+	}
+	
+	h.sm.Put(r.Context(), "authenticatedUserID", id)
+
+	response.Success(w, "login successful")
 }

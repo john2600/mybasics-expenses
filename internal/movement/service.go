@@ -7,15 +7,16 @@ import (
 	"time"
 )
 
-// Service defines the business logic for movements.
+// Service defines the business logic for movements. Every operation is scoped
+// to a single user via userID (for lists, it travels inside Filter.UserID).
 type Service interface {
-	CreateMovement(ctx context.Context, req CreateRequest) (*Movement, error)
+	CreateMovement(ctx context.Context, userID int, req CreateRequest) (*Movement, error)
 	ListMovements(ctx context.Context, f Filter) ([]GroupedByCategory, error)
 	ListExpenses(ctx context.Context, f Filter) ([]Movement, error)
-	GetMovement(ctx context.Context, id int64) (*Movement, error)
-	UpdateMovement(ctx context.Context, id int64, req UpdateRequest) (*Movement, error)
-	DeleteMovement(ctx context.Context, id int64) error
-	GetMonthlySummary(ctx context.Context) ([]MonthlySummary, error)
+	GetMovement(ctx context.Context, userID int, id int64) (*Movement, error)
+	UpdateMovement(ctx context.Context, userID int, id int64, req UpdateRequest) (*Movement, error)
+	DeleteMovement(ctx context.Context, userID int, id int64) error
+	GetMonthlySummary(ctx context.Context, userID int) ([]MonthlySummary, error)
 }
 
 type service struct {
@@ -27,7 +28,7 @@ func NewService(repo Repository) Service {
 	return &service{repo: repo}
 }
 
-func (s *service) CreateMovement(ctx context.Context, req CreateRequest) (*Movement, error) {
+func (s *service) CreateMovement(ctx context.Context, userID int, req CreateRequest) (*Movement, error) {
 	if req.Amount <= 0 {
 		return nil, errors.New("amount must be greater than zero")
 	}
@@ -60,7 +61,7 @@ func (s *service) CreateMovement(ctx context.Context, req CreateRequest) (*Movem
 		m.Hour = &req.Hour
 	}
 
-	return s.repo.Create(ctx, m)
+	return s.repo.Create(ctx, userID, m)
 }
 
 func (s *service) ListMovements(ctx context.Context, f Filter) ([]GroupedByCategory, error) {
@@ -101,21 +102,21 @@ func (s *service) ListExpenses(ctx context.Context, f Filter) ([]Movement, error
 	return movements, nil
 }
 
-func (s *service) GetMovement(ctx context.Context, id int64) (*Movement, error) {
-	return s.repo.FindByID(ctx, id)
+func (s *service) GetMovement(ctx context.Context, userID int, id int64) (*Movement, error) {
+	return s.repo.FindByID(ctx, userID, id)
 }
 
-func (s *service) UpdateMovement(ctx context.Context, id int64, req UpdateRequest) (*Movement, error) {
+func (s *service) UpdateMovement(ctx context.Context, userID int, id int64, req UpdateRequest) (*Movement, error) {
 	if req.Type != nil && *req.Type != "I" && *req.Type != "E" {
 		return nil, errors.New("type must be 'I' (ingreso) or 'E' (egreso)")
 	}
-	return s.repo.Update(ctx, id, req)
+	return s.repo.Update(ctx, userID, id, req)
 }
 
-func (s *service) DeleteMovement(ctx context.Context, id int64) error {
-	return s.repo.Delete(ctx, id)
+func (s *service) DeleteMovement(ctx context.Context, userID int, id int64) error {
+	return s.repo.Delete(ctx, userID, id)
 }
 
-func (s *service) GetMonthlySummary(ctx context.Context) ([]MonthlySummary, error) {
-	return s.repo.MonthlySummary(ctx)
+func (s *service) GetMonthlySummary(ctx context.Context, userID int) ([]MonthlySummary, error) {
+	return s.repo.MonthlySummary(ctx, userID)
 }
