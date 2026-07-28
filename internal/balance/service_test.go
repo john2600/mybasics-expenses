@@ -139,7 +139,9 @@ func TestGetPeriods_SinglePeriodSurplus(t *testing.T) {
 	// income_config: amount=5_000_000, cut_day=24
 	// period expenses=2_000_000, registered_incomes=0
 	// carry_over_in=0 → balance=3_000_000 → carry_over_out=3_000_000, deficit=0
-	earliest := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC) // dentro del periodo 24 Mar-23 Abr
+	// earliest en el periodo actual → exactamente un periodo (test determinista,
+	// independiente de la fecha del sistema).
+	earliest := time.Now()
 	repo := &mockRepository{
 		earliestDate:   ptrTime(earliest),
 		periodExpenses: 2_000_000,
@@ -222,8 +224,9 @@ func TestGetPeriods_CarryOverAddsToNextPeriod(t *testing.T) {
 
 func TestGetPeriods_RegisteredIncomesIncluded(t *testing.T) {
 	// registered_incomes=500_000, expenses=3_000_000, fixed=5_000_000
-	// balance = 5M + 500K - 3M = 2.5M
-	earliest := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+	// balance = 5M + 500K - 3M = 2.5M (un solo periodo, carry_over_in=0)
+	// earliest en el periodo actual → exactamente un periodo (test determinista).
+	earliest := time.Now()
 	repo := &mockRepository{
 		earliestDate:   ptrTime(earliest),
 		periodExpenses: 3_000_000,
