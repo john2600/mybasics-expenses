@@ -9,13 +9,12 @@ import (
 	"github.com/jscodelab/mybasics-expenses/internal/incomes"
 )
 
-
 type mockRepository struct {
-	summary         *balance.Summary
-	err             error
-	earliestDate    *time.Time
-	periodExpenses  float64
-	periodIncomes   float64
+	summary        *balance.Summary
+	err            error
+	earliestDate   *time.Time
+	periodExpenses float64
+	periodIncomes  float64
 }
 
 func (m *mockRepository) GetSummary(_ context.Context, _ int, _, _ *time.Time) (*balance.Summary, error) {
@@ -35,15 +34,15 @@ type mockIncomesRepository struct {
 	err error
 }
 
-func (m *mockIncomesRepository) Get(_ context.Context) (*incomes.Config, error) {
+func (m *mockIncomesRepository) Get(_ context.Context, _ int) (*incomes.Config, error) {
 	return m.cfg, m.err
 }
 
-func (m *mockIncomesRepository) GetForMonth(_ context.Context, _ time.Time) (*incomes.Config, error) {
+func (m *mockIncomesRepository) GetForMonth(_ context.Context, _ int, _ time.Time) (*incomes.Config, error) {
 	return m.cfg, m.err
 }
 
-func (m *mockIncomesRepository) Update(_ context.Context, _ incomes.UpdateRequest) (*incomes.Config, error) {
+func (m *mockIncomesRepository) Update(_ context.Context, _ int, _ incomes.UpdateRequest) (*incomes.Config, error) {
 	return m.cfg, m.err
 }
 
@@ -59,7 +58,7 @@ func TestGetBalance_WithDates(t *testing.T) {
 	}
 	svc := balance.NewService(repo, defaultIncomesRepo)
 
-	got, err := svc.GetBalance(context.Background(), 1,"2026-03-01", "2026-03-30")
+	got, err := svc.GetBalance(context.Background(), 1, "2026-03-01", "2026-03-30")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -80,7 +79,7 @@ func TestGetBalance_NoDates(t *testing.T) {
 	}
 	svc := balance.NewService(repo, defaultIncomesRepo)
 
-	_, err := svc.GetBalance(context.Background(), 1,"", "")
+	_, err := svc.GetBalance(context.Background(), 1, "", "")
 	if err != nil {
 		t.Fatalf("unexpected error with empty dates: %v", err)
 	}
@@ -89,7 +88,7 @@ func TestGetBalance_NoDates(t *testing.T) {
 func TestGetBalance_InvalidDateFrom(t *testing.T) {
 	svc := balance.NewService(&mockRepository{}, defaultIncomesRepo)
 
-	_, err := svc.GetBalance(context.Background(), 1,"not-a-date", "")
+	_, err := svc.GetBalance(context.Background(), 1, "not-a-date", "")
 	if err == nil {
 		t.Fatal("expected error for invalid date_from, got nil")
 	}
@@ -98,7 +97,7 @@ func TestGetBalance_InvalidDateFrom(t *testing.T) {
 func TestGetBalance_InvalidDateTo(t *testing.T) {
 	svc := balance.NewService(&mockRepository{}, defaultIncomesRepo)
 
-	_, err := svc.GetBalance(context.Background(), 1,"", "not-a-date")
+	_, err := svc.GetBalance(context.Background(), 1, "", "not-a-date")
 	if err == nil {
 		t.Fatal("expected error for invalid date_to, got nil")
 	}
@@ -112,7 +111,7 @@ func TestGetBalance_NegativeBalance(t *testing.T) {
 	}
 	svc := balance.NewService(repo, defaultIncomesRepo)
 
-	got, err := svc.GetBalance(context.Background(), 1,"2026-03-01", "2026-03-30")
+	got, err := svc.GetBalance(context.Background(), 1, "2026-03-01", "2026-03-30")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -254,7 +253,7 @@ func TestGetBalance_CarryOverFromPreviousPeriod(t *testing.T) {
 	}
 	svc := balance.NewService(repo, defaultIncomesRepo)
 
-	got, err := svc.GetBalance(context.Background(), 1,"2026-03-24", "2026-04-18")
+	got, err := svc.GetBalance(context.Background(), 1, "2026-03-24", "2026-04-18")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -272,7 +271,7 @@ func TestGetBalance_CarryOverZeroWhenDeficit(t *testing.T) {
 	}
 	svc := balance.NewService(repo, defaultIncomesRepo)
 
-	got, err := svc.GetBalance(context.Background(), 1,"2026-03-24", "2026-04-18")
+	got, err := svc.GetBalance(context.Background(), 1, "2026-03-24", "2026-04-18")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -291,7 +290,7 @@ func TestGetBalance_CarryOverNoDates(t *testing.T) {
 	}
 	svc := balance.NewService(repo, defaultIncomesRepo)
 
-	got, err := svc.GetBalance(context.Background(), 1,"", "")
+	got, err := svc.GetBalance(context.Background(), 1, "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -306,7 +305,7 @@ func TestGetBalance_IncludesIncomeConfig(t *testing.T) {
 	}
 	svc := balance.NewService(repo, defaultIncomesRepo)
 
-	got, err := svc.GetBalance(context.Background(), 1,"", "")
+	got, err := svc.GetBalance(context.Background(), 1, "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

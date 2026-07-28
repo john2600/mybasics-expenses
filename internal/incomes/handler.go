@@ -2,9 +2,11 @@ package incomes
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jscodelab/mybasics-expenses/internal/security"
 	"github.com/jscodelab/mybasics-expenses/pkg/response"
 )
 
@@ -27,7 +29,13 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 // get returns the current income config.
 // GET /api/v1/incomes/config
 func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
-	cfg, err := h.svc.GetConfig(r.Context())
+	userID, ok := security.UserID(r.Context())
+	if !ok {
+		response.Unauthorized(w, errors.New("not authenticated"))
+		return
+	}
+
+	cfg, err := h.svc.GetConfig(r.Context(), userID)
 	if err != nil {
 		response.InternalError(w, err)
 		return
@@ -38,13 +46,19 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 // update modifies the income config (partial update).
 // PUT /api/v1/incomes/config
 func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
+	userID, ok := security.UserID(r.Context())
+	if !ok {
+		response.Unauthorized(w, errors.New("not authenticated"))
+		return
+	}
+
 	var req UpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.BadRequest(w, err)
 		return
 	}
 
-	cfg, err := h.svc.UpdateConfig(r.Context(), req)
+	cfg, err := h.svc.UpdateConfig(r.Context(), userID, req)
 	if err != nil {
 		response.BadRequest(w, err)
 		return

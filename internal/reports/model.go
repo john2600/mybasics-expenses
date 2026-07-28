@@ -4,6 +4,7 @@ package reports
 type ExportFilter struct {
 	Months int
 	Format string
+	UserID int // owner scope; set by the handler, not from client input
 }
 
 // ExportRow represents a single expense in the export.

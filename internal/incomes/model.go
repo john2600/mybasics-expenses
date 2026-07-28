@@ -16,7 +16,7 @@ type Config struct {
 // UpdateRequest is the payload to create or update an income config entry.
 // If YearMonth is omitted, the current month is used.
 type UpdateRequest struct {
-	YearMonth   *string  `json:"year_month"`  // "YYYY-MM"; defaults to current month
+	YearMonth   *string  `json:"year_month"` // "YYYY-MM"; defaults to current month
 	Amount      *float64 `json:"amount"`
 	CutDay      *int     `json:"cut_day"`
 	Description *string  `json:"description"`

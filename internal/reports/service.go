@@ -30,11 +30,11 @@ func NewService(repo Repository) Service {
 func (s *service) Export(ctx context.Context, f ExportFilter) (*ExportReport, error) {
 	from, to := dateRange(f.Months)
 
-	expenses, err := s.repo.QueryExpenses(ctx, from, to)
+	expenses, err := s.repo.QueryExpenses(ctx, f.UserID, from, to)
 	if err != nil {
 		return nil, err
 	}
-	summary, err := s.repo.MonthlySummary(ctx, from, to)
+	summary, err := s.repo.MonthlySummary(ctx, f.UserID, from, to)
 	if err != nil {
 		return nil, err
 	}

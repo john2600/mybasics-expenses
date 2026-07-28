@@ -271,6 +271,29 @@ does not. Verify the connection with `claude mcp list`.
 
 Base URL: `http://localhost:8080/api/v1`
 
+### Autenticación
+
+La API usa **sesiones del lado del servidor** (cookie `session`, store en MySQL vía
+`alexedwards/scs`). El flujo es: registrar un usuario, iniciar sesión, y usar la
+cookie recibida en las peticiones a los endpoints protegidos.
+
+| Método | Ruta            | Auth    | Descripción                                            |
+|--------|-----------------|---------|--------------------------------------------------------|
+| POST   | `/user`         | Pública | Registra un usuario (contraseña con bcrypt, nunca en claro) |
+| POST   | `/user/login`   | Pública | Inicia sesión; guarda el `id` del usuario en la sesión y devuelve la cookie |
+
+**Registro** — body `{ "username", "name", "email", "password" }`.
+`password` debe tener entre 8 y 72 caracteres. `username` y `email` son únicos.
+
+**Login** — body `{ "email", "password" }`. Respuesta `200` + cookie `session`
+(`HttpOnly`). Credenciales inválidas → `401`.
+
+**Endpoints protegidos** — todo lo que está bajo `/api/v1` **excepto** `/user` y
+`/user/login` requiere una sesión válida. Sin cookie → `401 {"error":"not authenticated"}`.
+Cada petición se filtra por el usuario autenticado: los movimientos, el balance, la
+config de ingreso, los reportes y la analítica sólo devuelven datos de ese usuario.
+Las **categorías son compartidas** entre todos los usuarios.
+
 ### Categorías
 | Método | Ruta                  | Descripción                     |
 |--------|-----------------------|---------------------------------|
@@ -293,6 +316,11 @@ Base URL: `http://localhost:8080/api/v1`
 
 Filtros de `GET /movements`: `category_id`, `type`, `date_from`, `date_to`, `limit`.
 
+> Todos los endpoints de Movimientos, Ingreso fijo, Balance, Reportes y Analítica
+> están **protegidos**: requieren la cookie de sesión y están acotados al usuario
+> autenticado. El `user_id` **no** se envía en el body ni en la query — se toma de
+> la sesión.
+
 ### Ingreso fijo, balance, reportes y analítica
 | Método | Ruta                             | Descripción                            |
 |--------|----------------------------------|----------------------------------------|
@@ -311,10 +339,28 @@ Filtros de `GET /movements`: `category_id`, `type`, `date_from`, `date_to`, `lim
 
 ## Ejemplos con curl
 
+Registrar un usuario:
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/user \
+  -H "Content-Type: application/json" \
+  -d '{"username": "john", "name": "John Doe", "email": "john@example.com", "password": "supersecret"}' | jq .
+```
+
+Iniciar sesión y guardar la cookie de sesión en `cookies.txt`:
+
+```bash
+curl -s -c cookies.txt -X POST http://localhost:8080/api/v1/user/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "john@example.com", "password": "supersecret"}' | jq .
+```
+
+A partir de aquí, las peticiones protegidas usan la cookie con `-b cookies.txt`.
+
 Crear un gasto:
 
 ```bash
-curl -s -X POST http://localhost:8080/api/v1/movements \
+curl -s -b cookies.txt -X POST http://localhost:8080/api/v1/movements \
   -H "Content-Type: application/json" \
   -d '{
     "category_id": 1,
@@ -329,21 +375,21 @@ curl -s -X POST http://localhost:8080/api/v1/movements \
 Registrar un ingreso:
 
 ```bash
-curl -s -X POST http://localhost:8080/api/v1/movements \
+curl -s -b cookies.txt -X POST http://localhost:8080/api/v1/movements \
   -H "Content-Type: application/json" \
   -d '{"category_id": 11, "type": "I", "amount": 3000000, "description": "Salario", "date": "2026-07-01"}' | jq .
 ```
 
-Listar movimientos agrupados por categoría:
+Listar movimientos agrupados por categoría (del usuario en sesión):
 
 ```bash
-curl -s http://localhost:8080/api/v1/movements | jq .
+curl -s -b cookies.txt http://localhost:8080/api/v1/movements | jq .
 ```
 
 Fijar el ingreso mensual:
 
 ```bash
-curl -s -X PUT http://localhost:8080/api/v1/incomes/config \
+curl -s -b cookies.txt -X PUT http://localhost:8080/api/v1/incomes/config \
   -H "Content-Type: application/json" \
   -d '{"amount": 3000000, "cut_day": 24}' | jq .
 ```

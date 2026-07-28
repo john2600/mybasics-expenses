@@ -37,9 +37,9 @@ func (s *service) GetBalance(ctx context.Context, userID int, dateFrom, dateTo s
 	// Use the config that was active for this period's month.
 	var cfg *incomes.Config
 	if from != nil {
-		cfg, err = s.incomesRepo.GetForMonth(ctx, *from)
+		cfg, err = s.incomesRepo.GetForMonth(ctx, userID, *from)
 	} else {
-		cfg, err = s.incomesRepo.Get(ctx)
+		cfg, err = s.incomesRepo.Get(ctx, userID)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("fetching income config: %w", err)
@@ -67,7 +67,7 @@ func (s *service) GetBalance(ctx context.Context, userID int, dateFrom, dateTo s
 	}
 
 	// Use the config that was active during the previous period.
-	prevCfg, err := s.incomesRepo.GetForMonth(ctx, prevFrom)
+	prevCfg, err := s.incomesRepo.GetForMonth(ctx, userID, prevFrom)
 	if err != nil {
 		return nil, fmt.Errorf("fetching prev income config: %w", err)
 	}
@@ -87,7 +87,7 @@ func (s *service) GetBalance(ctx context.Context, userID int, dateFrom, dateTo s
 
 func (s *service) GetPeriods(ctx context.Context, userID int) ([]PeriodSummary, error) {
 	// Latest config drives the cut_day used to build period boundaries.
-	latestCfg, err := s.incomesRepo.Get(ctx)
+	latestCfg, err := s.incomesRepo.Get(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("fetching income config: %w", err)
 	}
@@ -112,7 +112,7 @@ func (s *service) GetPeriods(ctx context.Context, userID int) ([]PeriodSummary, 
 		end := start.AddDate(0, 1, 0) // exclusive upper bound
 
 		// Use the income config that was active during this period's month.
-		cfg, err := s.incomesRepo.GetForMonth(ctx, start)
+		cfg, err := s.incomesRepo.GetForMonth(ctx, userID, start)
 		if err != nil {
 			return nil, fmt.Errorf("fetching config for period %s: %w", start.Format("2006-01"), err)
 		}
