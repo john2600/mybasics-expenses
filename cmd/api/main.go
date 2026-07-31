@@ -101,6 +101,7 @@ func main() {
 		// protegidas
 		r.Group(func(r chi.Router) {
 			r.Use(protect.RestrictEndpoint) // ← el middleware aquí
+			usersHandler.RegisterProtectedRoutes(r)
 			movementHandler.RegisterRoutes(r)
 			balanceHandler.RegisterRoutes(r)
 			analyticsHandler.RegisterRoutes(r)

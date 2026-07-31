@@ -277,16 +277,21 @@ La API usa **sesiones del lado del servidor** (cookie `session`, store en MySQL 
 `alexedwards/scs`). El flujo es: registrar un usuario, iniciar sesión, y usar la
 cookie recibida en las peticiones a los endpoints protegidos.
 
-| Método | Ruta            | Auth    | Descripción                                            |
-|--------|-----------------|---------|--------------------------------------------------------|
-| POST   | `/user`         | Pública | Registra un usuario (contraseña con bcrypt, nunca en claro) |
-| POST   | `/user/login`   | Pública | Inicia sesión; guarda el `id` del usuario en la sesión y devuelve la cookie |
+| Método | Ruta            | Auth       | Descripción                                            |
+|--------|-----------------|------------|--------------------------------------------------------|
+| POST   | `/user`         | Pública    | Registra un usuario (contraseña con bcrypt, nunca en claro) |
+| POST   | `/user/login`   | Pública    | Inicia sesión; guarda el `id` del usuario en la sesión y devuelve la cookie |
+| POST   | `/user/logout`  | Requiere sesión | Cierra la sesión actual (la destruye y expira la cookie) |
 
 **Registro** — body `{ "username", "name", "email", "password" }`.
 `password` debe tener entre 8 y 72 caracteres. `username` y `email` son únicos.
 
 **Login** — body `{ "email", "password" }`. Respuesta `200` + cookie `session`
 (`HttpOnly`). Credenciales inválidas → `401`.
+
+**Logout** — sin body, envía la cookie de sesión. Respuesta `200`. Destruye la
+sesión asociada a **esa** cookie (identificada por su token, no por el `id` del
+usuario), por lo que sólo cierra la sesión de ese dispositivo. Sin sesión → `401`.
 
 **Endpoints protegidos** — todo lo que está bajo `/api/v1` **excepto** `/user` y
 `/user/login` requiere una sesión válida. Sin cookie → `401 {"error":"not authenticated"}`.

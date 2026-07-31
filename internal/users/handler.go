@@ -23,10 +23,16 @@ func NewHandler(svc Service, sm *scs.SessionManager) *Handler {
 	return &Handler{svc: svc, sm: sm}
 }
 
-// RegisterRoutes registers user routes under the given router.
+// RegisterRoutes registers the public user routes (no session required).
 func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Post("/user", h.create)
 	r.Post("/user/login", h.login)
+}
+
+// RegisterProtectedRoutes registers user routes that require an active session.
+// Mount this inside the authenticated group.
+func (h *Handler) RegisterProtectedRoutes(r chi.Router) {
+	r.Post("/user/logout", h.logout)
 }
 
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
@@ -71,8 +77,19 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		response.InternalError(w, err)
 		return
 	}
-	
+
 	h.sm.Put(r.Context(), "authenticatedUserID", id)
 
 	response.Success(w, "login successful")
+}
+
+// logout ends the current session: it destroys the session data in the store
+// and instructs the middleware to expire the cookie.
+// POST /api/v1/user/logout
+func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
+	if err := h.sm.Destroy(r.Context()); err != nil {
+		response.InternalError(w, err)
+		return
+	}
+	response.Success(w, "logout successful")
 }
