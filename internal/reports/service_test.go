@@ -14,11 +14,11 @@ type mockRepo struct {
 	summary  []reports.MonthlySummary
 }
 
-func (m *mockRepo) QueryExpenses(_ context.Context, _, _ time.Time) ([]reports.ExportRow, error) {
+func (m *mockRepo) QueryExpenses(_ context.Context, _ int, _, _ time.Time) ([]reports.ExportRow, error) {
 	return m.expenses, nil
 }
 
-func (m *mockRepo) MonthlySummary(_ context.Context, _, _ time.Time) ([]reports.MonthlySummary, error) {
+func (m *mockRepo) MonthlySummary(_ context.Context, _ int, _, _ time.Time) ([]reports.MonthlySummary, error) {
 	return m.summary, nil
 }
 

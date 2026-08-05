@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jscodelab/mybasics-expenses/internal/security"
 	"github.com/jscodelab/mybasics-expenses/pkg/response"
 )
 
@@ -49,7 +50,13 @@ func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	report, err := h.svc.Export(r.Context(), ExportFilter{Months: months, Format: format})
+	userID, ok := security.UserID(r.Context())
+	if !ok {
+		response.Unauthorized(w, errors.New("not authenticated"))
+		return
+	}
+
+	report, err := h.svc.Export(r.Context(), ExportFilter{Months: months, Format: format, UserID: userID})
 	if err != nil {
 		response.InternalError(w, err)
 		return

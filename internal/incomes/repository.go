@@ -8,14 +8,16 @@ import (
 )
 
 // Repository defines the data access contract for income config.
+// Every operation is scoped to a single user via userID.
 type Repository interface {
-	// Get returns the most recent income config entry.
-	Get(ctx context.Context) (*Config, error)
-	// GetForMonth returns the most recent entry whose year_month <= month.
+	// Get returns the user's most recent income config entry, or a neutral
+	// default when they have none yet.
+	Get(ctx context.Context, userID int) (*Config, error)
+	// GetForMonth returns the user's most recent entry whose year_month <= month.
 	// Falls back to Get if no entry exists before that month.
-	GetForMonth(ctx context.Context, month time.Time) (*Config, error)
+	GetForMonth(ctx context.Context, userID int, month time.Time) (*Config, error)
 	// Update upserts a config entry for the given month (defaults to current month).
-	Update(ctx context.Context, req UpdateRequest) (*Config, error)
+	Update(ctx context.Context, userID int, req UpdateRequest) (*Config, error)
 }
 
 type mysqlRepository struct {
@@ -37,22 +39,39 @@ func scanConfig(row *sql.Row) (*Config, error) {
 	return &c, nil
 }
 
-func (r *mysqlRepository) Get(ctx context.Context) (*Config, error) {
-	q := selectFields + " ORDER BY `year_month` DESC LIMIT 1"
-	c, err := scanConfig(r.db.QueryRowContext(ctx, q))
+// defaultConfig is returned when a user has no income config yet: a neutral
+// starting point they can override via the API. Replaces the old seed row.
+func defaultConfig() *Config {
+	now := time.Now().UTC()
+	return &Config{
+		YearMonth:   time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC),
+		Amount:      0,
+		CutDay:      24,
+		Description: "Ingreso fijo",
+		CreatedAt:   now,
+	}
+}
+
+func (r *mysqlRepository) Get(ctx context.Context, userID int) (*Config, error) {
+	q := selectFields + " WHERE user_id = ? ORDER BY `year_month` DESC LIMIT 1"
+	c, err := scanConfig(r.db.QueryRowContext(ctx, q, userID))
+	if err == sql.ErrNoRows {
+		// User has no config yet — hand back a neutral default.
+		return defaultConfig(), nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("fetching income config: %w", err)
 	}
 	return c, nil
 }
 
-func (r *mysqlRepository) GetForMonth(ctx context.Context, month time.Time) (*Config, error) {
+func (r *mysqlRepository) GetForMonth(ctx context.Context, userID int, month time.Time) (*Config, error) {
 	firstDay := time.Date(month.Year(), month.Month(), 1, 0, 0, 0, 0, time.UTC)
-	q := selectFields + " WHERE `year_month` <= ? ORDER BY `year_month` DESC LIMIT 1"
-	c, err := scanConfig(r.db.QueryRowContext(ctx, q, firstDay))
+	q := selectFields + " WHERE user_id = ? AND `year_month` <= ? ORDER BY `year_month` DESC LIMIT 1"
+	c, err := scanConfig(r.db.QueryRowContext(ctx, q, userID, firstDay))
 	if err == sql.ErrNoRows {
-		// No entry at or before this month — use the latest known.
-		return r.Get(ctx)
+		// No entry at or before this month — use the latest known (or default).
+		return r.Get(ctx, userID)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("fetching income config for %s: %w", firstDay.Format("2006-01"), err)
@@ -60,8 +79,8 @@ func (r *mysqlRepository) GetForMonth(ctx context.Context, month time.Time) (*Co
 	return c, nil
 }
 
-func (r *mysqlRepository) Update(ctx context.Context, req UpdateRequest) (*Config, error) {
-	base, err := r.Get(ctx)
+func (r *mysqlRepository) Update(ctx context.Context, userID int, req UpdateRequest) (*Config, error) {
+	base, err := r.Get(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -90,11 +109,11 @@ func (r *mysqlRepository) Update(ctx context.Context, req UpdateRequest) (*Confi
 		description = *req.Description
 	}
 
-	const q = "INSERT INTO income_config_history (`year_month`, amount, cut_day, description) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE amount = VALUES(amount), cut_day = VALUES(cut_day), description = VALUES(description)"
-	if _, err := r.db.ExecContext(ctx, q, targetMonth, amount, cutDay, description); err != nil {
+	const q = "INSERT INTO income_config_history (user_id, `year_month`, amount, cut_day, description) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE amount = VALUES(amount), cut_day = VALUES(cut_day), description = VALUES(description)"
+	if _, err := r.db.ExecContext(ctx, q, userID, targetMonth, amount, cutDay, description); err != nil {
 		return nil, fmt.Errorf("upserting income config: %w", err)
 	}
-	return r.GetForMonth(ctx, targetMonth)
+	return r.GetForMonth(ctx, userID, targetMonth)
 }
 
 func parseYearMonth(s string) (time.Time, error) {

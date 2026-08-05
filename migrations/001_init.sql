@@ -57,19 +57,22 @@ CREATE TABLE IF NOT EXISTS movements (
 
 -- ------------------------------------------------------------
 -- Table: income_config_history
--- Versioned fixed monthly income. Each row is valid from its
--- year_month forward until a newer row exists.
--- Query: WHERE `year_month` <= ? ORDER BY `year_month` DESC LIMIT 1
+-- Versioned fixed monthly income, per user. Each row is valid from its
+-- year_month forward until a newer row exists for the same user.
+-- Query: WHERE user_id = ? AND `year_month` <= ? ORDER BY `year_month` DESC LIMIT 1
+-- No FK by design (orphans tolerated). When a user has no config row, the app
+-- returns a default (amount 0, cut_day 24), so no baseline row is seeded.
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS income_config_history (
     id           INT UNSIGNED     NOT NULL AUTO_INCREMENT,
+    user_id      BIGINT UNSIGNED  NULL,               -- owner; no FK by design
     `year_month` DATE             NOT NULL,          -- stored as first day of month
     amount       DECIMAL(12, 2)   NOT NULL,
     cut_day      TINYINT UNSIGNED NOT NULL DEFAULT 24,
     description  VARCHAR(255)     NOT NULL DEFAULT 'Ingreso fijo',
     created_at   DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    UNIQUE KEY uq_year_month (`year_month`),
+    UNIQUE KEY uq_user_year_month (user_id, `year_month`),
     CONSTRAINT chk_ich_cut_day CHECK (cut_day BETWEEN 1 AND 28)
 ) ENGINE=InnoDB;
 
@@ -121,10 +124,6 @@ INSERT INTO categories (name, description, color) VALUES
     ('Otros',               'Gastos varios',                           '#6B7280')
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
--- ------------------------------------------------------------
--- Seed: baseline income config so GET /income always returns a row.
--- Neutral starting value (0). Update it via the API.
--- ------------------------------------------------------------
-INSERT INTO income_config_history (`year_month`, amount, cut_day, description)
-VALUES (DATE_FORMAT(NOW(), '%Y-%m-01'), 0.00, 24, 'Ingreso fijo')
-ON DUPLICATE KEY UPDATE amount = VALUES(amount);
+-- No income config is seeded: it is now per-user, and the app returns a
+-- neutral default (amount 0, cut_day 24) until a user sets their own via
+-- PUT /api/v1/incomes/config.

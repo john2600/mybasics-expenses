@@ -9,13 +9,12 @@ import (
 	"github.com/jscodelab/mybasics-expenses/internal/incomes"
 )
 
-
 type mockRepository struct {
-	summary         *balance.Summary
-	err             error
-	earliestDate    *time.Time
-	periodExpenses  float64
-	periodIncomes   float64
+	summary        *balance.Summary
+	err            error
+	earliestDate   *time.Time
+	periodExpenses float64
+	periodIncomes  float64
 }
 
 func (m *mockRepository) GetSummary(_ context.Context, _ int, _, _ *time.Time) (*balance.Summary, error) {
@@ -35,15 +34,15 @@ type mockIncomesRepository struct {
 	err error
 }
 
-func (m *mockIncomesRepository) Get(_ context.Context) (*incomes.Config, error) {
+func (m *mockIncomesRepository) Get(_ context.Context, _ int) (*incomes.Config, error) {
 	return m.cfg, m.err
 }
 
-func (m *mockIncomesRepository) GetForMonth(_ context.Context, _ time.Time) (*incomes.Config, error) {
+func (m *mockIncomesRepository) GetForMonth(_ context.Context, _ int, _ time.Time) (*incomes.Config, error) {
 	return m.cfg, m.err
 }
 
-func (m *mockIncomesRepository) Update(_ context.Context, _ incomes.UpdateRequest) (*incomes.Config, error) {
+func (m *mockIncomesRepository) Update(_ context.Context, _ int, _ incomes.UpdateRequest) (*incomes.Config, error) {
 	return m.cfg, m.err
 }
 
@@ -59,7 +58,7 @@ func TestGetBalance_WithDates(t *testing.T) {
 	}
 	svc := balance.NewService(repo, defaultIncomesRepo)
 
-	got, err := svc.GetBalance(context.Background(), 1,"2026-03-01", "2026-03-30")
+	got, err := svc.GetBalance(context.Background(), 1, "2026-03-01", "2026-03-30")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -80,7 +79,7 @@ func TestGetBalance_NoDates(t *testing.T) {
 	}
 	svc := balance.NewService(repo, defaultIncomesRepo)
 
-	_, err := svc.GetBalance(context.Background(), 1,"", "")
+	_, err := svc.GetBalance(context.Background(), 1, "", "")
 	if err != nil {
 		t.Fatalf("unexpected error with empty dates: %v", err)
 	}
@@ -89,7 +88,7 @@ func TestGetBalance_NoDates(t *testing.T) {
 func TestGetBalance_InvalidDateFrom(t *testing.T) {
 	svc := balance.NewService(&mockRepository{}, defaultIncomesRepo)
 
-	_, err := svc.GetBalance(context.Background(), 1,"not-a-date", "")
+	_, err := svc.GetBalance(context.Background(), 1, "not-a-date", "")
 	if err == nil {
 		t.Fatal("expected error for invalid date_from, got nil")
 	}
@@ -98,7 +97,7 @@ func TestGetBalance_InvalidDateFrom(t *testing.T) {
 func TestGetBalance_InvalidDateTo(t *testing.T) {
 	svc := balance.NewService(&mockRepository{}, defaultIncomesRepo)
 
-	_, err := svc.GetBalance(context.Background(), 1,"", "not-a-date")
+	_, err := svc.GetBalance(context.Background(), 1, "", "not-a-date")
 	if err == nil {
 		t.Fatal("expected error for invalid date_to, got nil")
 	}
@@ -112,7 +111,7 @@ func TestGetBalance_NegativeBalance(t *testing.T) {
 	}
 	svc := balance.NewService(repo, defaultIncomesRepo)
 
-	got, err := svc.GetBalance(context.Background(), 1,"2026-03-01", "2026-03-30")
+	got, err := svc.GetBalance(context.Background(), 1, "2026-03-01", "2026-03-30")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -140,7 +139,9 @@ func TestGetPeriods_SinglePeriodSurplus(t *testing.T) {
 	// income_config: amount=5_000_000, cut_day=24
 	// period expenses=2_000_000, registered_incomes=0
 	// carry_over_in=0 → balance=3_000_000 → carry_over_out=3_000_000, deficit=0
-	earliest := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC) // dentro del periodo 24 Mar-23 Abr
+	// earliest en el periodo actual → exactamente un periodo (test determinista,
+	// independiente de la fecha del sistema).
+	earliest := time.Now()
 	repo := &mockRepository{
 		earliestDate:   ptrTime(earliest),
 		periodExpenses: 2_000_000,
@@ -223,8 +224,9 @@ func TestGetPeriods_CarryOverAddsToNextPeriod(t *testing.T) {
 
 func TestGetPeriods_RegisteredIncomesIncluded(t *testing.T) {
 	// registered_incomes=500_000, expenses=3_000_000, fixed=5_000_000
-	// balance = 5M + 500K - 3M = 2.5M
-	earliest := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+	// balance = 5M + 500K - 3M = 2.5M (un solo periodo, carry_over_in=0)
+	// earliest en el periodo actual → exactamente un periodo (test determinista).
+	earliest := time.Now()
 	repo := &mockRepository{
 		earliestDate:   ptrTime(earliest),
 		periodExpenses: 3_000_000,
@@ -254,7 +256,7 @@ func TestGetBalance_CarryOverFromPreviousPeriod(t *testing.T) {
 	}
 	svc := balance.NewService(repo, defaultIncomesRepo)
 
-	got, err := svc.GetBalance(context.Background(), 1,"2026-03-24", "2026-04-18")
+	got, err := svc.GetBalance(context.Background(), 1, "2026-03-24", "2026-04-18")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -272,7 +274,7 @@ func TestGetBalance_CarryOverZeroWhenDeficit(t *testing.T) {
 	}
 	svc := balance.NewService(repo, defaultIncomesRepo)
 
-	got, err := svc.GetBalance(context.Background(), 1,"2026-03-24", "2026-04-18")
+	got, err := svc.GetBalance(context.Background(), 1, "2026-03-24", "2026-04-18")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -291,7 +293,7 @@ func TestGetBalance_CarryOverNoDates(t *testing.T) {
 	}
 	svc := balance.NewService(repo, defaultIncomesRepo)
 
-	got, err := svc.GetBalance(context.Background(), 1,"", "")
+	got, err := svc.GetBalance(context.Background(), 1, "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -306,7 +308,7 @@ func TestGetBalance_IncludesIncomeConfig(t *testing.T) {
 	}
 	svc := balance.NewService(repo, defaultIncomesRepo)
 
-	got, err := svc.GetBalance(context.Background(), 1,"", "")
+	got, err := svc.GetBalance(context.Background(), 1, "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

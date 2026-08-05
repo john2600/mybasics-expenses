@@ -8,9 +8,10 @@ import (
 )
 
 // Repository defines the data access contract for report generation.
+// Every query is scoped to a single user via userID.
 type Repository interface {
-	QueryExpenses(ctx context.Context, from, to time.Time) ([]ExportRow, error)
-	MonthlySummary(ctx context.Context, from, to time.Time) ([]MonthlySummary, error)
+	QueryExpenses(ctx context.Context, userID int, from, to time.Time) ([]ExportRow, error)
+	MonthlySummary(ctx context.Context, userID int, from, to time.Time) ([]MonthlySummary, error)
 }
 
 type mysqlRepository struct {
@@ -22,15 +23,15 @@ func NewMySQLRepository(db *sql.DB) Repository {
 	return &mysqlRepository{db: db}
 }
 
-func (r *mysqlRepository) QueryExpenses(ctx context.Context, from, to time.Time) ([]ExportRow, error) {
+func (r *mysqlRepository) QueryExpenses(ctx context.Context, userID int, from, to time.Time) ([]ExportRow, error) {
 	const q = `
 		SELECT m.id, m.date, c.name, m.description, m.amount
 		FROM   movements m
 		JOIN   categories c ON c.id = m.category_id
-		WHERE  m.type = 'E' AND m.date BETWEEN ? AND ?
+		WHERE  m.user_id = ? AND m.type = 'E' AND m.date BETWEEN ? AND ?
 		ORDER  BY m.date DESC`
 
-	rows, err := r.db.QueryContext(ctx, q, from.Format(time.DateOnly), to.Format(time.DateOnly))
+	rows, err := r.db.QueryContext(ctx, q, userID, from.Format(time.DateOnly), to.Format(time.DateOnly))
 	if err != nil {
 		return nil, fmt.Errorf("querying expenses for export: %w", err)
 	}
@@ -49,15 +50,15 @@ func (r *mysqlRepository) QueryExpenses(ctx context.Context, from, to time.Time)
 	return expenses, rows.Err()
 }
 
-func (r *mysqlRepository) MonthlySummary(ctx context.Context, from, to time.Time) ([]MonthlySummary, error) {
+func (r *mysqlRepository) MonthlySummary(ctx context.Context, userID int, from, to time.Time) ([]MonthlySummary, error) {
 	const q = `
 		SELECT YEAR(date), MONTH(date), SUM(amount)
 		FROM   movements
-		WHERE  type = 'E' AND date BETWEEN ? AND ?
+		WHERE  user_id = ? AND type = 'E' AND date BETWEEN ? AND ?
 		GROUP  BY YEAR(date), MONTH(date)
 		ORDER  BY YEAR(date), MONTH(date)`
 
-	rows, err := r.db.QueryContext(ctx, q, from.Format(time.DateOnly), to.Format(time.DateOnly))
+	rows, err := r.db.QueryContext(ctx, q, userID, from.Format(time.DateOnly), to.Format(time.DateOnly))
 	if err != nil {
 		return nil, fmt.Errorf("querying monthly summary: %w", err)
 	}
