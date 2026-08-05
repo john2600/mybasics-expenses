@@ -50,9 +50,8 @@ func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, ok := security.UserID(r.Context())
+	userID, ok := security.RequireUserID(w, r)
 	if !ok {
-		response.Unauthorized(w, errors.New("not authenticated"))
 		return
 	}
 

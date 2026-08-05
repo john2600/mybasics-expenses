@@ -1,7 +1,6 @@
 package balance
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 
@@ -32,9 +31,8 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 	dateFrom := r.URL.Query().Get("date_from")
 	dateTo := r.URL.Query().Get("date_to")
 
-	userID, ok := security.UserID(r.Context())
+	userID, ok := security.RequireUserID(w, r)
 	if !ok {
-		response.Unauthorized(w, errors.New("not authenticated"))
 		return
 	}
 	summary, err := h.svc.GetBalance(r.Context(), userID, dateFrom, dateTo)
@@ -53,9 +51,8 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 // periods returns the carry-over balance per billing period.
 // GET /api/v1/balance/periods
 func (h *Handler) periods(w http.ResponseWriter, r *http.Request) {
-	userID, ok := security.UserID(r.Context())
+	userID, ok := security.RequireUserID(w, r)
 	if !ok {
-		response.Unauthorized(w, errors.New("not authenticated"))
 		return
 	}
 	periods, err := h.svc.GetPeriods(r.Context(), userID)
