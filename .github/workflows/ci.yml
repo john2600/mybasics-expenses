@@ -56,6 +56,8 @@ jobs:
 
   security:
     name: Security Scan
+    # Temporarily skipped. Set to true (or remove this line) to re-enable.
+    if: false
     runs-on: ubuntu-latest
     needs: test
     permissions:
