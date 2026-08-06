@@ -77,6 +77,14 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
+// ChangePassword is the payload for authenticating an existing user.
+type ChangePasswordRequest struct {
+	LoginRequest LoginRequest `json:"login_request"`
+	NewPassword  string `json:"new_password"`
+}
+
+
+
 // bcrypt refuses passwords longer than 72 bytes, so we cap the length here to
 // return a clean validation error instead of a hashing failure downstream.
 const maxPasswordBytes = 72

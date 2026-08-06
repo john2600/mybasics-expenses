@@ -26,6 +26,7 @@ func NewHandler(svc Service, sm *scs.SessionManager) *Handler {
 // RegisterRoutes registers the public user routes (no session required).
 func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Post("/user", h.create)
+	r.Post("/change_password", h.updatePassword)
 	r.Post("/user/login", h.login)
 }
 
@@ -42,6 +43,23 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err := h.svc.InsertUser(r.Context(), req)
+	if err != nil {
+		response.BadRequest(w, err)
+		return
+	}
+
+	response.Created(w, "user created")
+}
+
+func (h *Handler) updatePassword(w http.ResponseWriter, r *http.Request) {
+	var passwordRequest ChangePasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&passwordRequest); err != nil {
+		response.BadRequest(w, err)
+		return
+	}
+
+	// si el usuario ya
 	err := h.svc.InsertUser(r.Context(), req)
 	if err != nil {
 		response.BadRequest(w, err)
