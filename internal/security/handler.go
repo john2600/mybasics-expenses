@@ -54,3 +54,20 @@ func UserID(ctx context.Context) (int, bool) {
 	id, ok := ctx.Value(userIDKey).(int)
 	return id, ok
 }
+
+// RequireUserID returns the authenticated user id from the request context.
+// When it is absent, it writes a 401 "not authenticated" response to w and
+// returns ok=false — so ok==false always means "a 401 has already been sent,
+// just stop". Handlers use it as:
+//
+//	userID, ok := security.RequireUserID(w, r)
+//	if !ok {
+//		return
+//	}
+func RequireUserID(w http.ResponseWriter, r *http.Request) (int, bool) {
+	id, ok := UserID(r.Context())
+	if !ok {
+		response.Unauthorized(w, errors.New("not authenticated"))
+	}
+	return id, ok
+}

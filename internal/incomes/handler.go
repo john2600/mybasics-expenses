@@ -2,7 +2,6 @@ package incomes
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -29,9 +28,8 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 // get returns the current income config.
 // GET /api/v1/incomes/config
 func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
-	userID, ok := security.UserID(r.Context())
+	userID, ok := security.RequireUserID(w, r)
 	if !ok {
-		response.Unauthorized(w, errors.New("not authenticated"))
 		return
 	}
 
@@ -46,9 +44,8 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 // update modifies the income config (partial update).
 // PUT /api/v1/incomes/config
 func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
-	userID, ok := security.UserID(r.Context())
+	userID, ok := security.RequireUserID(w, r)
 	if !ok {
-		response.Unauthorized(w, errors.New("not authenticated"))
 		return
 	}
 

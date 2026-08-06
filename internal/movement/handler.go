@@ -42,9 +42,8 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, ok := security.UserID(r.Context())
+	userID, ok := security.RequireUserID(w, r)
 	if !ok {
-		response.Unauthorized(w, errors.New("not authenticated"))
 		return
 	}
 
@@ -65,9 +64,8 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, err)
 		return
 	}
-	userID, ok := security.UserID(r.Context())
+	userID, ok := security.RequireUserID(w, r)
 	if !ok {
-		response.Unauthorized(w, errors.New("not authenticated"))
 		return
 	}
 	f.UserID = userID
@@ -94,9 +92,8 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, ok := security.UserID(r.Context())
+	userID, ok := security.RequireUserID(w, r)
 	if !ok {
-		response.Unauthorized(w, errors.New("not authenticated"))
 		return
 	}
 	m, err := h.svc.GetMovement(r.Context(), userID, id)
@@ -127,9 +124,8 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, ok := security.UserID(r.Context())
+	userID, ok := security.RequireUserID(w, r)
 	if !ok {
-		response.Unauthorized(w, errors.New("not authenticated"))
 		return
 	}
 	m, err := h.svc.UpdateMovement(r.Context(), userID, id, req)
@@ -158,9 +154,8 @@ func (h *Handler) delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, ok := security.UserID(r.Context())
+	userID, ok := security.RequireUserID(w, r)
 	if !ok {
-		response.Unauthorized(w, errors.New("not authenticated"))
 		return
 	}
 	if err := h.svc.DeleteMovement(r.Context(), userID, id); err != nil {
@@ -183,9 +178,8 @@ func (h *Handler) expenses(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, err)
 		return
 	}
-	userID, ok := security.UserID(r.Context())
+	userID, ok := security.RequireUserID(w, r)
 	if !ok {
-		response.Unauthorized(w, errors.New("not authenticated"))
 		return
 	}
 	f.UserID = userID
@@ -202,9 +196,8 @@ func (h *Handler) expenses(w http.ResponseWriter, r *http.Request) {
 // summary returns totals grouped by month.
 // GET /api/v1/movements/summary
 func (h *Handler) summary(w http.ResponseWriter, r *http.Request) {
-	userID, ok := security.UserID(r.Context())
+	userID, ok := security.RequireUserID(w, r)
 	if !ok {
-		response.Unauthorized(w, errors.New("not authenticated"))
 		return
 	}
 	summaries, err := h.svc.GetMonthlySummary(r.Context(), userID)

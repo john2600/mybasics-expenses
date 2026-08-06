@@ -119,9 +119,8 @@ func parseFilter(w http.ResponseWriter, r *http.Request) (Filter, bool) {
 		}
 		months = n
 	}
-	userID, ok := security.UserID(r.Context())
+	userID, ok := security.RequireUserID(w, r)
 	if !ok {
-		response.Unauthorized(w, errors.New("not authenticated"))
 		return Filter{}, false
 	}
 	return Filter{Months: months, UserID: userID}, true
