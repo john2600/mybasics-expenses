@@ -11,6 +11,7 @@ import (
 type Repository interface {
 	Create(ctx context.Context, m *User) error
 	GetUserID(ctx context.Context, m *User) (int, error)
+	GetUserByEmail(ctx context.Context, email string) (*User, error)
 }
 
 type mysqlRepository struct {
@@ -58,4 +59,25 @@ func (r *mysqlRepository) GetUserID(ctx context.Context, user *User) (int, error
 	}
 
 	return id, nil
+}
+
+// GetUserByEmail returns the full user record for the given email, including
+// the id and the hashed password. It returns ErrNoRecord when no user matches.
+func (r *mysqlRepository) GetUserByEmail(ctx context.Context, email string) (*User, error) {
+	const q = `SELECT id, username, name, email, hashed_password, created_at, updated_at
+	           FROM users
+	           WHERE email = ?`
+
+	var u User
+	err := r.db.QueryRowContext(ctx, q, email).Scan(
+		&u.ID, &u.User, &u.Name, &u.Email, &u.HashedPassword, &u.Created, &u.Updated,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNoRecord
+		}
+		return nil, fmt.Errorf("fetching user by email: %w", err)
+	}
+
+	return &u, nil
 }

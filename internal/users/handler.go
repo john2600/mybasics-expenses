@@ -60,13 +60,13 @@ func (h *Handler) updatePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// si el usuario ya
-	err := h.svc.InsertUser(r.Context(), req)
+	err := h.svc.ChangePassword(r.Context(), passwordRequest)
 	if err != nil {
 		response.BadRequest(w, err)
 		return
 	}
 
-	response.Created(w, "user created")
+	response.Success(w, "user created")
 }
 
 // login authenticates a user and stores their id in the session.

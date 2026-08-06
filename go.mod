@@ -3,6 +3,7 @@ module github.com/jscodelab/mybasics-expenses
 go 1.23
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/alexedwards/scs/mysqlstore v0.0.0-20251002162104-209de6e426de
 	github.com/alexedwards/scs/v2 v2.9.0
 	github.com/go-chi/chi/v5 v5.2.5
