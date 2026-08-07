@@ -4,22 +4,22 @@ import "time"
 
 // Movement represents a single financial movement (income or expense).
 type Movement struct {
-	ID              int64     `json:"id"`
-	CategoryID      int64     `json:"category_id"`
-	Category        string    `json:"category,omitempty"`
-	Type            string    `json:"type"`            // 'I' = ingreso, 'E' = egreso
-	Amount          float64   `json:"amount"`
-	Description     string    `json:"description"`
-	Date            time.Time `json:"date"`
-	Hour            *string   `json:"hour,omitempty"` // format HH:MM:SS, optional
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID          int64     `json:"id"`
+	CategoryID  int64     `json:"category_id"`
+	Category    string    `json:"category,omitempty"`
+	Type        string    `json:"type"` // 'I' = ingreso, 'E' = egreso
+	Amount      float64   `json:"amount"`
+	Description string    `json:"description"`
+	Date        time.Time `json:"date"`
+	Hour        *string   `json:"hour,omitempty"` // format HH:MM:SS, optional
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // CreateRequest is the payload for creating a new movement.
 type CreateRequest struct {
 	CategoryID  int64   `json:"category_id"`
-	Type        string  `json:"type"`        // 'I' or 'E'
+	Type        string  `json:"type"` // 'I' or 'E'
 	Amount      float64 `json:"amount"`
 	Description string  `json:"description"`
 	Date        string  `json:"date"` // Expected format: YYYY-MM-DD

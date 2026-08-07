@@ -46,27 +46,24 @@ func (s *service) ChangePassword(ctx context.Context, req ChangePasswordRequest)
 		return fmt.Errorf("error updating password: %w", err)
 	}
 
+	// obtain the password
 	resp, err := s.repo.GetUserByEmail(ctx, req.LoginRequest.Email)
 
 	if err != nil {
 		return fmt.Errorf("Error updating password  %w", err)
 	}
 
-	user := UserPassword{
-		ID:       resp.ID,
-		Email:    resp.Email,
-		Password: string(resp.HashedPassword),
-	}
-
-	// it needs to be hashed
-	err = user.ComparePassword([]byte(req.LoginRequest.Password))
+	err = ComparePassword(resp.HashedPassword, req.LoginRequest.Password)
 	if err != nil {
 		return fmt.Errorf("password not coincidences  %w", err)
 	}
 
-	// update pasword
-	//return s.repo.Create(ctx, &user)
-	return nil
+	newPassword, err := EncriptPassword(string(req.NewPassword))
+	if err != nil {
+		return fmt.Errorf("error encripting password  %w", err)
+	}
+
+	return s.repo.UpdatePassword(ctx, resp.ID, newPassword)
 }
 
 func (s *service) Authenticate(ctx context.Context, email, password string) (int, error) {

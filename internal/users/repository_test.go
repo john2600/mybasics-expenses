@@ -62,6 +62,56 @@ func TestGetUserByEmail_ReturnsFullRecord(t *testing.T) {
 	}
 }
 
+func TestUpdatePassword_Success(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("opening sqlmock: %v", err)
+	}
+	defer db.Close()
+
+	repo := NewMySQLRepository(db)
+
+	id := 7
+	hashed := []byte("$2a$12$newlyhashedpasswordvalue0123456789abcdefghij")
+
+	mock.ExpectExec(`(?s)UPDATE users SET hashed_password = \? WHERE id = \?`).
+		WithArgs(hashed, id).
+		WillReturnResult(sqlmock.NewResult(0, 1)) // 1 row affected
+
+	if err := repo.UpdatePassword(context.Background(), id, hashed); err != nil {
+		t.Fatalf("UpdatePassword returned error: %v", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet sqlmock expectations: %v", err)
+	}
+}
+
+func TestUpdatePassword_NoRowsAffected(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("opening sqlmock: %v", err)
+	}
+	defer db.Close()
+
+	repo := NewMySQLRepository(db)
+
+	id := 999
+	hashed := []byte("$2a$12$whatever")
+
+	mock.ExpectExec(`(?s)UPDATE users SET hashed_password = \? WHERE id = \?`).
+		WithArgs(hashed, id).
+		WillReturnResult(sqlmock.NewResult(0, 0)) // no rows matched
+
+	if err := repo.UpdatePassword(context.Background(), id, hashed); !errors.Is(err, ErrNoRecord) {
+		t.Errorf("error = %v, want ErrNoRecord", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet sqlmock expectations: %v", err)
+	}
+}
+
 func TestGetUserByEmail_NotFound(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {

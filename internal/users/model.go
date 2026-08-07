@@ -29,36 +29,17 @@ type User struct {
 	Updated        time.Time
 }
 
-type UserPassword struct {
-	ID       int
-	Email    string
-	Password string
-	Updated  time.Time
-}
-
-func (u *User) ComparePassword(hashedPassword []byte) error {
-	err := bcrypt.CompareHashAndPassword(hashedPassword, []byte(u.Password))
+// ComparePassword checks a plaintext password against a stored bcrypt hash.
+// It returns nil on a match, ErrInvalidCredentials on a mismatch, and any other
+// bcrypt error unchanged.
+func ComparePassword(hashedPassword []byte, plainPassword string) error {
+	err := bcrypt.CompareHashAndPassword(hashedPassword, []byte(plainPassword))
 	if err != nil {
 		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
 			return ErrInvalidCredentials
 		}
 		return err
-
 	}
-
-	return nil
-}
-
-func (u *UserPassword) ComparePassword(hashedPassword []byte) error {
-	err := bcrypt.CompareHashAndPassword(hashedPassword, []byte(u.Password))
-	if err != nil {
-		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
-			return ErrInvalidCredentials
-		}
-		return err
-
-	}
-
 	return nil
 }
 
@@ -83,6 +64,18 @@ func (u *User) Normalize() error {
 }
 
 func EncriptPassword(password string) ([]byte, error) {
+	if password != "" {
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
+		if err != nil {
+			return []byte{}, fmt.Errorf("hashing password: %w", err)
+		}
+		return hashedPassword, nil
+	}
+
+	return []byte{}, nil
+}
+
+func DecriptPassword(password string) ([]byte, error) {
 	if password != "" {
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 		if err != nil {
@@ -139,6 +132,15 @@ func (u *ChangePasswordRequest) Validate() error {
 
 	if u.NewPassword == "" {
 		return errors.New("new password needs to be filled")
+	}
+	if len(u.NewPassword) < 8 {
+		return errors.New("new password debe tener al menos 8 caracteres")
+	}
+	if len(u.NewPassword) > maxPasswordBytes {
+		return errors.New("new password no puede superar los 72 caracteres")
+	}
+	if u.NewPassword == u.LoginRequest.Password {
+		return errors.New("new password must be different from the current one")
 	}
 
 	return nil

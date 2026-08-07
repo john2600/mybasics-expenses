@@ -26,13 +26,13 @@ func NewHandler(svc Service, sm *scs.SessionManager) *Handler {
 // RegisterRoutes registers the public user routes (no session required).
 func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Post("/user", h.create)
-	r.Post("/change_password", h.updatePassword)
 	r.Post("/user/login", h.login)
 }
 
 // RegisterProtectedRoutes registers user routes that require an active session.
 // Mount this inside the authenticated group.
 func (h *Handler) RegisterProtectedRoutes(r chi.Router) {
+	r.Post("/change_password", h.updatePassword)
 	r.Post("/user/logout", h.logout)
 }
 
@@ -52,6 +52,11 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	response.Created(w, "user created")
 }
 
+// updatePassword changes the current user's password. The route is mounted
+// behind RestrictEndpoint, so reaching this handler already implies an active
+// session; the request body additionally carries the current password, which
+// the service verifies before applying the change.
+// POST /api/v1/change_password
 func (h *Handler) updatePassword(w http.ResponseWriter, r *http.Request) {
 	var passwordRequest ChangePasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&passwordRequest); err != nil {
@@ -59,14 +64,12 @@ func (h *Handler) updatePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// si el usuario ya
-	err := h.svc.ChangePassword(r.Context(), passwordRequest)
-	if err != nil {
+	if err := h.svc.ChangePassword(r.Context(), passwordRequest); err != nil {
 		response.BadRequest(w, err)
 		return
 	}
 
-	response.Success(w, "user created")
+	response.Success(w, "password updated")
 }
 
 // login authenticates a user and stores their id in the session.
