@@ -41,6 +41,10 @@ CREATE TABLE IF NOT EXISTS movements (
     description TEXT             NOT NULL,
     date        DATE             NOT NULL,
     hour        TIME             NULL,
+    -- Email-ingestion source (future feature): identifies the source message so
+    -- an already-imported email is not duplicated. NULL for manual movements.
+    mail_uid        BIGINT UNSIGNED NULL,
+    mail_message_id VARCHAR(255)    NULL,
     created_at  DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at  DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
@@ -49,6 +53,9 @@ CREATE TABLE IF NOT EXISTS movements (
     INDEX idx_movements_category_id (category_id),
     INDEX idx_movements_user_id     (user_id),
     INDEX idx_movements_type        (type),
+    -- Dedup for email ingestion. NULLs are distinct in a UNIQUE key, so many
+    -- manual (NULL, NULL) movements coexist; only real mail ids dedup.
+    UNIQUE KEY uq_mail_source (mail_uid, mail_message_id),
     CONSTRAINT fk_movements_category
         FOREIGN KEY (category_id) REFERENCES categories (id)
         ON UPDATE CASCADE
