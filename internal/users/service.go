@@ -16,6 +16,7 @@ func NewService(repo Repository) Service {
 
 type Service interface {
 	InsertUser(ctx context.Context, req UserRequest) error
+	ChangePassword(ctx context.Context, req ChangePasswordRequest) error
 	Authenticate(ctx context.Context, user, password string) (int, error)
 }
 
@@ -37,6 +38,32 @@ func (s *service) InsertUser(ctx context.Context, req UserRequest) error {
 	}
 
 	return s.repo.Create(ctx, &user)
+}
+
+func (s *service) ChangePassword(ctx context.Context, req ChangePasswordRequest) error {
+	err := req.Validate()
+	if err != nil {
+		return fmt.Errorf("error updating password: %w", err)
+	}
+
+	// obtain the password
+	resp, err := s.repo.GetUserByEmail(ctx, req.LoginRequest.Email)
+
+	if err != nil {
+		return fmt.Errorf("Error updating password  %w", err)
+	}
+
+	err = ComparePassword(resp.HashedPassword, req.LoginRequest.Password)
+	if err != nil {
+		return fmt.Errorf("password not coincidences  %w", err)
+	}
+
+	newPassword, err := EncriptPassword(string(req.NewPassword))
+	if err != nil {
+		return fmt.Errorf("error encripting password  %w", err)
+	}
+
+	return s.repo.UpdatePassword(ctx, resp.ID, newPassword)
 }
 
 func (s *service) Authenticate(ctx context.Context, email, password string) (int, error) {

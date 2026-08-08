@@ -277,21 +277,35 @@ La API usa **sesiones del lado del servidor** (cookie `session`, store en MySQL 
 `alexedwards/scs`). El flujo es: registrar un usuario, iniciar sesión, y usar la
 cookie recibida en las peticiones a los endpoints protegidos.
 
-| Método | Ruta            | Auth       | Descripción                                            |
-|--------|-----------------|------------|--------------------------------------------------------|
-| POST   | `/user`         | Pública    | Registra un usuario (contraseña con bcrypt, nunca en claro) |
-| POST   | `/user/login`   | Pública    | Inicia sesión; guarda el `id` del usuario en la sesión y devuelve la cookie |
-| POST   | `/user/logout`  | Requiere sesión | Cierra la sesión actual (la destruye y expira la cookie) |
+| Método | Ruta               | Auth            | Descripción                                            |
+|--------|--------------------|-----------------|--------------------------------------------------------|
+| POST   | `/user`            | Pública         | Registra un usuario (contraseña con bcrypt, nunca en claro) |
+| POST   | `/user/login`      | Pública         | Inicia sesión; guarda el `id` del usuario en la sesión y devuelve la cookie |
+| POST   | `/user/logout`     | Requiere sesión | Cierra la sesión actual (la destruye y expira la cookie) |
+| POST   | `/change_password` | Requiere sesión | Cambia la contraseña del usuario (verifica la actual)  |
 
 **Registro** — body `{ "username", "name", "email", "password" }`.
 `password` debe tener entre 8 y 72 caracteres. `username` y `email` son únicos.
+Respuesta `201` `{ "data": "user created" }`.
 
 **Login** — body `{ "email", "password" }`. Respuesta `200` + cookie `session`
-(`HttpOnly`). Credenciales inválidas → `401`.
+(`HttpOnly`). Credenciales inválidas → `401 { "error": "invalid email or password" }`.
 
 **Logout** — sin body, envía la cookie de sesión. Respuesta `200`. Destruye la
 sesión asociada a **esa** cookie (identificada por su token, no por el `id` del
 usuario), por lo que sólo cierra la sesión de ese dispositivo. Sin sesión → `401`.
+
+**Cambio de contraseña** — requiere sesión activa **y** re-verifica la contraseña
+actual en el body. Body:
+```json
+{
+  "login_request": { "email": "john@example.com", "password": "currentPass123" },
+  "new_password": "brandNewPass456"
+}
+```
+Reglas: `new_password` entre 8 y 72 caracteres y **distinta** de la actual.
+Respuestas: `200 { "data": "password updated" }` en éxito; `400` si la contraseña
+actual no coincide o falla la validación; `401` si no hay sesión.
 
 **Endpoints protegidos** — todo lo que está bajo `/api/v1` **excepto** `/user` y
 `/user/login` requiere una sesión válida. Sin cookie → `401 {"error":"not authenticated"}`.

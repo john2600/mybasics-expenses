@@ -11,8 +11,8 @@ import (
 
 // mockRepository is a test double for movement.Repository.
 type mockRepository struct {
-	movements    []movement.Movement
-	err          error
+	movements      []movement.Movement
+	err            error
 	capturedFilter movement.Filter
 }
 

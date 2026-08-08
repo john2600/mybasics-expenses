@@ -12,7 +12,8 @@ Steps:
 5. Register an income
 6. Register an expense
 7. List expenses
-8. Log out (kill the session)
+8. Change the password
+9. Log out (kill the session)
 
 ---
 
@@ -235,7 +236,44 @@ excluded):
 
 ---
 
-## 8. Log out (kill the session)
+## 8. Change the password
+
+Protected endpoint — requires the session cookie **and** re-verifies the current
+password in the body (defence in depth). The `new_password` must be 8–72 chars
+and different from the current one.
+
+```bash
+curl -s -b "$CJ" -X POST "$BASE/change_password" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "login_request": { "email": "john@example.com", "password": "supersecret" },
+    "new_password": "evenbettersecret"
+  }' | jq .
+```
+
+**Expected — `200 OK`:**
+
+```json
+{ "data": "password updated" }
+```
+
+Failure cases the UI should handle:
+- Wrong current password → `400 { "error": "password not coincidences ..." }`
+- `new_password` too short / equal to current → `400` with the validation message
+- No session → `401 { "error": "not authenticated" }`
+
+Confirm the change — logging in with the **new** password now works:
+
+```bash
+curl -s -c "$CJ" -X POST "$BASE/user/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "john@example.com", "password": "evenbettersecret"}' | jq .
+# → { "data": "login successful" }
+```
+
+---
+
+## 9. Log out (kill the session)
 
 Protected endpoint. Destroys the session tied to the cookie sent with this
 request (scs identifies it by the cookie's token, not by user id) and expires
@@ -292,7 +330,10 @@ echo "6) expense";                curl -s -b "$CJ" -X POST "$BASE/movements" -H 
 
 echo "7) list expenses";          curl -s -b "$CJ" "$BASE/movements/expenses?limit=10"; echo
 
-echo "8) logout";                 curl -s -b "$CJ" -c "$CJ" -X POST "$BASE/user/logout"; echo
+echo "8) change password";        curl -s -b "$CJ" -X POST "$BASE/change_password" -H "Content-Type: application/json" \
+  -d '{"login_request":{"email":"john@example.com","password":"supersecret"},"new_password":"evenbettersecret"}'; echo
+
+echo "9) logout";                 curl -s -b "$CJ" -c "$CJ" -X POST "$BASE/user/logout"; echo
 echo "   verify (expect 401)";    curl -s -b "$CJ" -o /dev/null -w '   HTTP %{http_code}\n' "$BASE/incomes/config"
 ```
 

@@ -29,20 +29,19 @@ type User struct {
 	Updated        time.Time
 }
 
-
-func (u *User) ComparePassword(hashedPassword []byte) error {
-	err := bcrypt.CompareHashAndPassword(hashedPassword, []byte(u.Password))
+// ComparePassword checks a plaintext password against a stored bcrypt hash.
+// It returns nil on a match, ErrInvalidCredentials on a mismatch, and any other
+// bcrypt error unchanged.
+func ComparePassword(hashedPassword []byte, plainPassword string) error {
+	err := bcrypt.CompareHashAndPassword(hashedPassword, []byte(plainPassword))
 	if err != nil {
 		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
 			return ErrInvalidCredentials
-		} 
+		}
 		return err
-		
 	}
-
 	return nil
 }
-
 
 // Normalize cleans up the user's fields and hashes the plaintext password into
 // HashedPassword. It must be called before persisting the user. bcrypt can
@@ -64,6 +63,30 @@ func (u *User) Normalize() error {
 	return nil
 }
 
+func EncriptPassword(password string) ([]byte, error) {
+	if password != "" {
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
+		if err != nil {
+			return []byte{}, fmt.Errorf("hashing password: %w", err)
+		}
+		return hashedPassword, nil
+	}
+
+	return []byte{}, nil
+}
+
+func DecriptPassword(password string) ([]byte, error) {
+	if password != "" {
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
+		if err != nil {
+			return []byte{}, fmt.Errorf("hashing password: %w", err)
+		}
+		return hashedPassword, nil
+	}
+
+	return []byte{}, nil
+}
+
 type UserRequest struct {
 	UserName string `json:"username"`
 	Name     string `json:"name"`
@@ -75,6 +98,52 @@ type UserRequest struct {
 type LoginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+}
+
+func (u *LoginRequest) Validate() error {
+	if u.Email == "" {
+		return errors.New("email es obligatorio")
+	}
+
+	if u.Password == "" {
+		return errors.New("password es obligatorio")
+	}
+	if len(u.Password) < 8 {
+		return errors.New("password debe tener al menos 8 caracteres")
+	}
+	if len(u.Password) > maxPasswordBytes {
+		return errors.New("password no puede superar los 72 caracteres")
+	}
+	return nil
+}
+
+// ChangePassword is the payload for authenticating an existing user.
+type ChangePasswordRequest struct {
+	LoginRequest LoginRequest `json:"login_request"`
+	NewPassword  string       `json:"new_password"`
+}
+
+func (u *ChangePasswordRequest) Validate() error {
+	err := u.LoginRequest.Validate()
+
+	if err != nil {
+		return err
+	}
+
+	if u.NewPassword == "" {
+		return errors.New("new password needs to be filled")
+	}
+	if len(u.NewPassword) < 8 {
+		return errors.New("new password debe tener al menos 8 caracteres")
+	}
+	if len(u.NewPassword) > maxPasswordBytes {
+		return errors.New("new password no puede superar los 72 caracteres")
+	}
+	if u.NewPassword == u.LoginRequest.Password {
+		return errors.New("new password must be different from the current one")
+	}
+
+	return nil
 }
 
 // bcrypt refuses passwords longer than 72 bytes, so we cap the length here to
@@ -110,4 +179,3 @@ func (u *UserRequest) Validate() error {
 
 	return nil
 }
-
