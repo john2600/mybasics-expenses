@@ -40,6 +40,23 @@ docker compose up --build
 docker compose up db
 ```
 
+## Data safety (running the app locally)
+
+**Never destroy the database volume unless the user explicitly asks.** The Docker
+volume `db_data` holds all local data (users, movements, income config, sessions).
+Losing it is unrecoverable — there is no automatic backup.
+
+- To apply code changes, use `docker compose up --build -d` — it rebuilds the
+  image and **keeps** the data.
+- `docker compose down` (without `-v`) is safe: it stops containers but keeps the
+  volume.
+- **Do NOT run `docker compose down -v`.** The `-v` deletes the volume and wipes
+  all data. Use it only when the user has **explicitly** asked for a clean/fresh
+  database.
+- If a schema/migration change genuinely requires recreating the volume, **stop
+  and ask first**, and offer to back up the data with `mysqldump` before wiping.
+- Prefer a real migration over recreating the volume whenever possible.
+
 ## Architecture
 
 The project follows a strict **Repository → Service → Handler** layered pattern:
