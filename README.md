@@ -327,13 +327,33 @@ Las **categorías son compartidas** entre todos los usuarios.
 |--------|--------------------------|--------------------------------------------------|
 | POST   | `/movements`             | Crea un movimiento (`type` `I`=ingreso, `E`=gasto) |
 | GET    | `/movements`             | Lista movimientos agrupados por categoría         |
-| GET    | `/movements/expenses`    | Lista plana de gastos (`?limit=&date_from=&date_to=`) |
+| GET    | `/movements/expenses`    | Lista plana de gastos **+ total** del filtro (`?category_id=&date_from=&date_to=&limit=`) |
 | GET    | `/movements/summary`     | Totales de gasto por mes                          |
 | GET    | `/movements/{id}`        | Obtiene un movimiento                             |
 | PUT    | `/movements/{id}`        | Edita un movimiento                              |
 | DELETE | `/movements/{id}`        | Elimina un movimiento                            |
 
 Filtros de `GET /movements`: `category_id`, `type`, `date_from`, `date_to`, `limit`.
+
+**`GET /movements/expenses`** devuelve la lista plana de gastos (`type=E`) más el
+`total` de los gastos que cumplen el filtro. Sin filtro, es el total de todos los
+gastos; con `category_id` / rango de fechas, el total de ese subconjunto. La
+respuesta es un objeto `{ total, movements }`:
+```json
+{
+  "data": {
+    "total": 148150,
+    "movements": [
+      { "id": 501, "category_id": 2, "category": "Alimentacion", "type": "E",
+        "amount": 26900, "description": "RAPPI COLOMBIA*DL",
+        "date": "2026-08-06T00:00:00Z", "created_at": "…", "updated_at": "…" }
+    ]
+  }
+}
+```
+> Filtros aceptados: `category_id`, `date_from`, `date_to`, `limit` (el `type`
+> siempre es `E`). Con `limit` (paginación) el `total` refleja los gastos
+> devueltos en esa página.
 
 > Todos los endpoints de Movimientos, Ingreso fijo, Balance, Reportes y Analítica
 > están **protegidos**: requieren la cookie de sesión y están acotados al usuario
@@ -403,6 +423,23 @@ Listar movimientos agrupados por categoría (del usuario en sesión):
 
 ```bash
 curl -s -b cookies.txt http://localhost:8080/api/v1/movements | jq .
+```
+
+Listar gastos con su total (lista plana). Sin filtro trae todos los gastos y su
+total; con filtros, el total de ese subconjunto:
+
+```bash
+# todos los gastos + total general
+curl -s -b cookies.txt "http://localhost:8080/api/v1/movements/expenses" | jq .
+
+# solo una categoría (p. ej. Alimentacion = 2) → total de esa categoría
+curl -s -b cookies.txt "http://localhost:8080/api/v1/movements/expenses?category_id=2" | jq .
+
+# por rango de fechas → total del rango
+curl -s -b cookies.txt "http://localhost:8080/api/v1/movements/expenses?date_from=2026-07-01&date_to=2026-07-31" | jq .
+
+# solo el total (sin la lista)
+curl -s -b cookies.txt "http://localhost:8080/api/v1/movements/expenses?category_id=2" | jq '.data.total'
 ```
 
 Fijar el ingreso mensual:

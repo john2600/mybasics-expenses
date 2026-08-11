@@ -203,35 +203,46 @@ curl -s -b "$CJ" -X POST "$BASE/movements" \
 
 ---
 
-## 7. List expenses
+## 7. List expenses (with total)
 
-Flat list of expenses (`type = E`) for the logged-in user, newest first.
-Optional filters: `limit`, `date_from`, `date_to`.
+Flat list of expenses (`type = E`) for the logged-in user, newest first, plus the
+`total` of the expenses matching the filter. With no filter it's the total of all
+expenses; with `category_id` / date range it's the total of that subset.
+Optional filters: `category_id`, `date_from`, `date_to`, `limit`.
 
 ```bash
-curl -s -b "$CJ" "$BASE/movements/expenses?limit=10" | jq .
+curl -s -b "$CJ" "$BASE/movements/expenses" | jq .
 ```
 
-**Expected — `200 OK`:** only this user's expenses (the income from step 5 is
-excluded):
+**Expected — `200 OK`:** an object `{ total, movements }` — only this user's
+expenses (the income from step 5 is excluded), and the total across them:
 
 ```json
 {
-  "data": [
-    {
-      "id": 2,
-      "category_id": 1,
-      "category": "Alimentacion",
-      "type": "E",
-      "amount": 42500,
-      "description": "Mercado de la semana",
-      "date": "2026-07-10T00:00:00Z",
-      "hour": "10:30:00",
-      "created_at": "…",
-      "updated_at": "…"
-    }
-  ]
+  "data": {
+    "total": 42500,
+    "movements": [
+      {
+        "id": 2,
+        "category_id": 1,
+        "category": "Alimentacion",
+        "type": "E",
+        "amount": 42500,
+        "description": "Mercado de la semana",
+        "date": "2026-07-10T00:00:00Z",
+        "hour": "10:30:00",
+        "created_at": "…",
+        "updated_at": "…"
+      }
+    ]
+  }
 }
+```
+
+Filtered total (e.g. one category) — same shape, `total` scoped to the filter:
+
+```bash
+curl -s -b "$CJ" "$BASE/movements/expenses?category_id=1" | jq '.data.total'
 ```
 
 ---

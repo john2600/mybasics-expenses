@@ -12,7 +12,7 @@ import (
 type Service interface {
 	CreateMovement(ctx context.Context, userID int, req CreateRequest) (*Movement, error)
 	ListMovements(ctx context.Context, f Filter) ([]GroupedByCategory, error)
-	ListExpenses(ctx context.Context, f Filter) ([]Movement, error)
+	ListExpenses(ctx context.Context, f Filter) (*ExpenseList, error)
 	GetMovement(ctx context.Context, userID int, id int64) (*Movement, error)
 	UpdateMovement(ctx context.Context, userID int, id int64, req UpdateRequest) (*Movement, error)
 	DeleteMovement(ctx context.Context, userID int, id int64) error
@@ -89,7 +89,7 @@ func (s *service) ListMovements(ctx context.Context, f Filter) ([]GroupedByCateg
 	return result, nil
 }
 
-func (s *service) ListExpenses(ctx context.Context, f Filter) ([]Movement, error) {
+func (s *service) ListExpenses(ctx context.Context, f Filter) (*ExpenseList, error) {
 	typeE := "E"
 	f.Type = &typeE
 	movements, err := s.repo.FindAll(ctx, f)
@@ -97,9 +97,17 @@ func (s *service) ListExpenses(ctx context.Context, f Filter) ([]Movement, error
 		return nil, err
 	}
 	if movements == nil {
-		return []Movement{}, nil
+		movements = []Movement{}
 	}
-	return movements, nil
+
+	// Total of the expenses matching the filter — summed in memory from the same
+	// list being returned, no extra query.
+	var total float64
+	for _, m := range movements {
+		total += m.Amount
+	}
+
+	return &ExpenseList{Total: total, Movements: movements}, nil
 }
 
 func (s *service) GetMovement(ctx context.Context, userID int, id int64) (*Movement, error) {
