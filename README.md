@@ -9,6 +9,24 @@ convierte en balances, reportes y analíticas.
 
 ---
 
+## Features
+
+Overview of what the API does (full catalog in
+[`docs/FEATURES.md`](docs/FEATURES.md)):
+
+- **Users & authentication** — registration, session login/logout (cookie),
+  change password; passwords hashed with bcrypt.
+- **Movements** — CRUD of income/expenses, list grouped by category, flat expenses
+  list **with total**, monthly summary; filters by category, type and dates.
+- **Categories** — CRUD (shared across users).
+- **Fixed income** — versioned monthly income config.
+- **Balance** — available balance and per billing period (with carry-over).
+- **Reports** — export to JSON / CSV / PDF.
+- **Analytics** — summary, by-category, trend, top-expenses, income-vs-expense.
+- **Per-user data** — every financial query is scoped to the logged-in user.
+
+---
+
 ## Stack
 
 - **Go 1.23** · router [chi](https://github.com/go-chi/chi) · `database/sql` + `go-sql-driver/mysql`
