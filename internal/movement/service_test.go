@@ -307,7 +307,11 @@ func TestListExpenses_WithLimit(t *testing.T) {
 	}
 	// el mock devuelve todo; verificamos que el Limit llega al repo (repo real lo aplica en SQL)
 	if list == nil {
-		t.Error("expected non-nil result")
+		t.Fatal("expected non-nil result")
+	}
+	// total = suma en memoria de los gastos devueltos (20000 + 8000 + 35000)
+	if list.Total != 63000 {
+		t.Errorf("expected total 63000, got %.2f", list.Total)
 	}
 }
 
@@ -318,8 +322,11 @@ func TestListExpenses_EmptyReturnsSlice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if list == nil {
+	if list.Movements == nil {
 		t.Error("expected empty slice, got nil")
+	}
+	if list.Total != 0 {
+		t.Errorf("expected total 0 for no expenses, got %.2f", list.Total)
 	}
 }
 

@@ -59,3 +59,12 @@ type MonthlySummary struct {
 	Month int     `json:"month"`
 	Total float64 `json:"total"`
 }
+
+// ExpenseList is the flat expenses listing plus the total amount of the
+// expenses matching the applied filter. The total is summed in memory from the
+// same expenses being returned (no extra query). With no filter it is the total
+// of all expenses.
+type ExpenseList struct {
+	Total     float64    `json:"total"`
+	Movements []Movement `json:"movements"`
+}
