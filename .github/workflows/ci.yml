@@ -1,30 +1,46 @@
+# Continuous integration pipeline (Go).
+#
+# Chained stages — lint → test → build — so a cheap lint failure does not spend
+# minutes running the race detector, and failing tests do not build a binary.
+# The first job that fails breaks the chain.
 name: CI
 
+# When this runs. `main` is this repo's default branch.
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
 
+# Permissions for the token GitHub injects into every job. Read-only: this
+# pipeline does not write to the repo, publish releases or deploy anything.
 permissions:
   contents: read
 
+# If two pushes land on the same ref back to back, cancel the earlier run
+# instead of leaving both competing. Saves minutes and avoids reading the
+# result of a commit that is already outdated.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
-    name: Test & Lint
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
+      # Pull the repository onto the runner.
       - uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      # Install Go. `cache: true` keeps the build/module cache between runs so
+      # dependencies are downloaded once and later runs are noticeably faster.
+      - uses: actions/setup-go@v5
         with:
           go-version: "1.23"
           cache: true
 
-      - name: Download dependencies
-        run: go mod download
-
+      # go.mod/go.sum must be tidy: `go mod tidy` then fail if it changed
+      # anything — catches an undeclared or stray dependency slipping in.
       - name: Verify go.mod is tidy
         run: |
           go mod tidy
@@ -35,18 +51,65 @@ jobs:
         with:
           version: latest
 
-      - name: Test
-        run: go test -race -coverprofile=coverage.out ./...
-
-  build:
-    name: Build
+  test:
+    name: Test
+    # Only starts once `lint` succeeded. Without this the jobs would run in
+    # parallel and you would watch tests run even when linting already failed.
+    needs: lint
     runs-on: ubuntu-latest
-    needs: test
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: true
+
+      # -race finds data races; -covermode=atomic is required for accurate
+      # counts under -race; -coverprofile writes the data the report steps read.
+      - name: Test
+        run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
+
+      # Print the total coverage in the job log. No threshold is enforced for
+      # now — this is reporting only, it never fails the pipeline.
+      - name: Coverage summary
+        run: go tool cover -func=coverage.out | tail -1
+
+      # Render a browsable HTML report from the profile.
+      - name: Coverage HTML report
+        run: go tool cover -html=coverage.out -o coverage.html
+
+      # Keep the raw profile and the HTML downloadable from the run page for
+      # inspection. Deploys/gates nothing — the natural hook for a coverage gate
+      # or badge later. Safe to drop.
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: |
+            coverage.out
+            coverage.html
+          retention-days: 7
+
+      # Push the profile to Codecov for PR comments and trend graphs. Tokenless
+      # works for public repos; for a private repo add a CODECOV_TOKEN secret and
+      # uncomment `token` below. `fail_ci_if_error: false` keeps a flaky upload
+      # from breaking the pipeline — coverage reporting must not gate CI (yet).
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.out
+          fail_ci_if_error: false
+          # token: ${{ secrets.CODECOV_TOKEN }}
+
+  build:
+    name: Build
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
         with:
           go-version: "1.23"
           cache: true
@@ -58,16 +121,15 @@ jobs:
     name: Security Scan
     # Temporarily skipped. Set to true (or remove this line) to re-enable.
     if: false
+    needs: lint
     runs-on: ubuntu-latest
-    needs: test
     permissions:
       contents: read
       security-events: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - uses: actions/setup-go@v5
         with:
           go-version: "1.23"
           cache: true
