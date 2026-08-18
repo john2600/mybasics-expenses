@@ -1,16 +1,11 @@
 -- ============================================================
--- MyBasics-Expenses – Definitive Schema
+-- MyBasics-Expenses – Initial schema (golang-migrate version 1)
 -- ============================================================
--- Single source of truth for structure and base seed data.
--- The database starts clean: base categories and one baseline
--- income-config row, but NO sample movements.
+-- Base structure + seed categories. No CREATE DATABASE / USE here: the target
+-- database is provided by the migrate DSN (and created by the MySQL container
+-- via MYSQL_DATABASE). NOTE: this file has multiple statements, so a fresh
+-- `migrate up` needs `multiStatements=true` in the DSN.
 -- ============================================================
-
-CREATE DATABASE IF NOT EXISTS mybasics_expenses
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-
-USE mybasics_expenses;
 
 -- ------------------------------------------------------------
 -- Table: categories

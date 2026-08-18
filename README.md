@@ -50,7 +50,7 @@ mybasics-expenses/
 │   ├── analytics/            # Agregaciones y tendencias
 │   └── platform/database/    # Factory de conexión MySQL
 ├── pkg/response/             # Helpers de respuesta (Envelope)
-├── migrations/001_init.sql   # Esquema definitivo + seed base
+├── migrations/                # Migraciones golang-migrate (000001_init..., 000002_...)
 ├── docker-compose.yml
 └── Dockerfile
 ```
@@ -247,9 +247,20 @@ docker compose up --build
 ```
 
 Aquí el API queda en **http://localhost:8081** y la base en el puerto `3308`.
-La migración `migrations/001_init.sql` se ejecuta automáticamente en el primer
-arranque: crea las tablas `categories`, `movements`, `income_config_history`,
-siembra categorías base y **ningún movimiento de ejemplo** (empiezas limpio).
+
+El esquema lo gestiona **golang-migrate** (ya no se auto-ejecuta un init). Tras
+levantar la base, aplica las migraciones con la imagen oficial `migrate/migrate`
+(sin borrar datos — nunca toca el volumen):
+
+```bash
+NET=mybasics-expenses_mybasics_expenses_net
+DSN="mysql://mybasics_user:secret@tcp(db:3306)/mybasics_expenses?multiStatements=true"
+docker run --rm --network "$NET" -v "$(pwd)/migrations:/migrations" migrate/migrate \
+  -path=/migrations -database "$DSN" up
+```
+
+Esto crea las tablas y siembra las categorías base. En una base que ya tenía el
+esquema antes de golang-migrate, haz `... force 1` una vez antes de `up`.
 
 ---
 

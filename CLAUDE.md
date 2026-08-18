@@ -89,6 +89,15 @@ and `analytics` all read from it.
 
 **Testing** — only service-layer unit tests exist, using inline mock structs that implement the repository interface. No integration tests. Tests live alongside the source (`service_test.go`).
 
-**Database** — connection pool is configured in `internal/platform/database/mysql.go` (MaxOpenConns=25, MaxIdleConns=10). The migration file `migrations/001_init.sql` is the single, definitive source of truth for schema and base seed data (categories + one baseline income row, no sample movements); it runs automatically via Docker Compose on first start.
+**Database** — connection pool is configured in `internal/platform/database/mysql.go` (MaxOpenConns=25, MaxIdleConns=10). Schema is managed by **golang-migrate**: the `migrations/` directory holds versioned pairs (`000001_init.up.sql`/`.down.sql`, `000002_...`, …). It is NOT auto-loaded by Docker Compose anymore — after the DB starts, apply pending migrations with `migrate up` (see below). The MySQL container still creates the empty database via `MYSQL_DATABASE`.
+
+Applying migrations (data-safe — never wipes the volume), using the official `migrate/migrate` image on the compose network:
+```bash
+NET=mybasics-expenses_mybasics_expenses_net
+DSN="mysql://mybasics_user:secret@tcp(db:3306)/mybasics_expenses?multiStatements=true"
+docker run --rm --network "$NET" -v "$(pwd)/migrations:/migrations" migrate/migrate \
+  -path=/migrations -database "$DSN" up
+```
+`multiStatements=true` is required because `000001_init` has multiple statements. On a DB that already had the schema before golang-migrate existed, baseline it once with `... force 1` before `up`.
 
 **Environment** — copy `.env.example` to `.env` before running locally. The app reads `PORT`, `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`.
