@@ -29,7 +29,7 @@ Overview of what the API does (full catalog in
 
 ## Stack
 
-- **Go 1.23** · router [chi](https://github.com/go-chi/chi) · `database/sql` + `go-sql-driver/mysql`
+- **Go 1.25** · router [chi](https://github.com/go-chi/chi) · `database/sql` + `go-sql-driver/mysql`
 - **MySQL 8.0** (Docker)
 - Patrón por capas **Repository → Service → Handler**
 - Módulo Go: `github.com/jscodelab/mybasics-expenses`

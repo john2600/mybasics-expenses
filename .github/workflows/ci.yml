@@ -36,7 +36,7 @@ jobs:
       # dependencies are downloaded once and later runs are noticeably faster.
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.25"
           cache: true
 
       # go.mod/go.sum must be tidy: `go mod tidy` then fail if it changed
@@ -62,7 +62,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.25"
           cache: true
 
       # -race finds data races; -covermode=atomic is required for accurate
@@ -111,7 +111,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.25"
           cache: true
 
       - name: Build
@@ -131,7 +131,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.25"
           cache: true
 
       - name: govulncheck
