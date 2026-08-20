@@ -78,6 +78,7 @@ type Application struct {
 	}
 
 	Users struct {
+		Mailer   mailer.Mailer
 		Repos    users.Repository
 		Services users.Service
 		Handlers *users.Handler
@@ -120,7 +121,7 @@ func (app *Application) initMailer() error {
 		Port:     port,
 		Username: getEnv("SMTP_USERNAME", ""),
 		Password: getEnv("SMTP_PASSWORD", ""),
-		From:     getEnv("SMTP_FROM", "MyBasics-Expenses <no-reply@mybasics.local>"),
+		From:     getEnv("SMTP_FROM", "MyBasics-Expenses <no-reply@example.com>"),
 	})
 	if err != nil {
 		return fmt.Errorf("initializing mailer: %w", err)
@@ -175,8 +176,9 @@ func (app *Application) initAnalytics() {
 }
 
 func (app *Application) initUsers() {
+	app.Users.Mailer = app.Mailer.Sender
 	app.Users.Repos = users.NewMySQLRepository(app.Database.DB)
-	app.Users.Services = users.NewService(app.Users.Repos)
+	app.Users.Services = users.NewService(app.Users.Repos, app.Mailer.Sender)
 	app.Users.Handlers = users.NewHandler(app.Users.Services, app.Sessions)
 }
 
@@ -194,6 +196,7 @@ func NewApp() (*Application, error) {
 		return nil, err
 	}
 	app.initSessions()
+
 	if err := app.initMailer(); err != nil {
 		return nil, err
 	}

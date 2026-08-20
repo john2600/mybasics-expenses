@@ -3,15 +3,19 @@ package users
 import (
 	"context"
 	"fmt"
+
+	"github.com/jscodelab/mybasics-expenses/internal/mailer"
 )
 
 type service struct {
-	repo Repository
+	repo   Repository
+	mailer mailer.Mailer
 }
 
-// NewService creates a new movement Service.
-func NewService(repo Repository) Service {
-	return &service{repo: repo}
+// NewService creates a new user Service. The mailer is used to send the welcome
+// email on registration; it may be nil (welcome email is skipped).
+func NewService(repo Repository, m mailer.Mailer) Service {
+	return &service{repo: repo, mailer: m}
 }
 
 type Service interface {
@@ -37,7 +41,13 @@ func (s *service) InsertUser(ctx context.Context, req UserRequest) error {
 		return fmt.Errorf("error creating user: %w", err)
 	}
 
-	return s.repo.Create(ctx, &user)
+	if err := s.repo.Create(ctx, &user); err != nil {
+		return err
+	}
+
+	// Best-effort welcome email — never fails the registration.
+	s.sendWelcomeEmail(ctx, &user)
+	return nil
 }
 
 func (s *service) ChangePassword(ctx context.Context, req ChangePasswordRequest) error {
