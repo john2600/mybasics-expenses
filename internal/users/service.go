@@ -3,6 +3,7 @@ package users
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jscodelab/mybasics-expenses/internal/mailer"
 )
@@ -45,8 +46,15 @@ func (s *service) InsertUser(ctx context.Context, req UserRequest) error {
 		return err
 	}
 
-	// Best-effort welcome email — never fails the registration.
-	s.sendWelcomeEmail(ctx, &user)
+	// Best-effort welcome email — never fails the registration. Async so the
+	// response isn't blocked; uses a fresh context because the request ctx is
+	// cancelled as soon as InsertUser returns.
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		s.sendWelcomeEmail(ctx, &user)
+	}()
+
 	return nil
 }
 

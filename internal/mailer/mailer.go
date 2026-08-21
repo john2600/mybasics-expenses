@@ -11,6 +11,7 @@ package mailer
 import (
 	"context"
 	"fmt"
+	"time"
 
 	mail "github.com/wneessen/go-mail"
 )
@@ -66,8 +67,22 @@ func (m *goMailer) Send(ctx context.Context, to, subject, body string) error {
 	msg.Subject(subject)
 	msg.SetBodyString(mail.TypeTextPlain, body)
 
-	if err := m.client.DialAndSendWithContext(ctx, msg); err != nil {
-		return fmt.Errorf("mailer: sending to %q: %w", to, err)
+	const maxAttempts = 3
+	var err error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if err = m.client.DialAndSendWithContext(ctx, msg); err == nil {
+			return nil
+		}
+		if attempt == maxAttempts {
+			break
+		}
+		// Backoff, but abort early if the caller's context is done.
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("mailer: sending to %q: %w", to, ctx.Err())
+		case <-time.After(500 * time.Millisecond):
+		}
 	}
-	return nil
+
+	return fmt.Errorf("mailer: sending to %q after %d attempts: %w", to, maxAttempts, err)
 }
