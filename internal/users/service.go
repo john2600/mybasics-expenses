@@ -6,23 +6,27 @@ import (
 	"time"
 
 	"github.com/jscodelab/mybasics-expenses/internal/mailer"
+	"github.com/jscodelab/mybasics-expenses/internal/security"
 )
 
 type service struct {
 	repo   Repository
 	mailer mailer.Mailer
+	tokens security.TokenService
 }
 
 // NewService creates a new user Service. The mailer is used to send the welcome
-// email on registration; it may be nil (welcome email is skipped).
-func NewService(repo Repository, m mailer.Mailer) Service {
-	return &service{repo: repo, mailer: m}
+// email on registration; it may be nil (welcome email is skipped). tokens is
+// used for the activation flow.
+func NewService(repo Repository, m mailer.Mailer, tokens security.TokenService) Service {
+	return &service{repo: repo, mailer: m, tokens: tokens}
 }
 
 type Service interface {
 	InsertUser(ctx context.Context, req UserRequest) error
 	ChangePassword(ctx context.Context, req ChangePasswordRequest) error
 	Authenticate(ctx context.Context, user, password string) (int, error)
+	ActiveUser(ctx context.Context, tokenPlainText string) error
 }
 
 func (s *service) InsertUser(ctx context.Context, req UserRequest) error {
@@ -46,13 +50,19 @@ func (s *service) InsertUser(ctx context.Context, req UserRequest) error {
 		return err
 	}
 
-	// Best-effort welcome email — never fails the registration. Async so the
-	// response isn't blocked; uses a fresh context because the request ctx is
-	// cancelled as soon as InsertUser returns.
+	// Issue the activation token for the new user.
+	token, err := s.tokens.New(ctx, user.ID, 3*24*time.Hour, security.ScopeActivation)
+	if err != nil {
+		return fmt.Errorf("error creating activation token: %w", err)
+	}
+
+	// Best-effort welcome email carrying the token — never fails the
+	// registration. Async so the response isn't blocked; uses a fresh context
+	// because the request ctx is cancelled as soon as InsertUser returns.
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		s.sendWelcomeEmail(ctx, &user)
+		s.sendWelcomeEmail(ctx, &user, token.Plaintext)
 	}()
 
 	return nil
@@ -91,6 +101,26 @@ func (s *service) Authenticate(ctx context.Context, email, password string) (int
 	}
 
 	return s.repo.GetUserID(ctx, user)
+}
+
+// ActiveUser activates the account tied to a valid activation token: it resolves
+// the token to a user, marks the user activated, and invalidates the activation
+// tokens so the link can't be reused.
+func (s *service) ActiveUser(ctx context.Context, tokenPlain string) error {
+	if tokenPlain == "" || len(tokenPlain) != 26 {
+		return fmt.Errorf("token invalid")
+	}
+
+	user, err := s.tokens.GetForToken(ctx, security.ScopeActivation, tokenPlain)
+	if err != nil {
+		return fmt.Errorf("activating user: %w", err)
+	}
+
+	if err := s.repo.Activate(ctx, user.ID); err != nil {
+		return fmt.Errorf("activating user: %w", err)
+	}
+
+	return s.tokens.DeleteAllTokensUser(ctx, security.ScopeActivation, user.ID)
 }
 
 func (s *service) Exists(id int) (bool, error) {

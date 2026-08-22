@@ -89,6 +89,11 @@ type Application struct {
 	Security struct {
 		Handlers *security.Security
 	}
+
+	Tokens struct {
+		Repos    security.TokenRepository
+		Services security.TokenService
+	}
 }
 
 func (app *Application) initDataBase() error {
@@ -175,10 +180,15 @@ func (app *Application) initAnalytics() {
 	app.Analytics.Handlers = analytics.NewHandler(app.Analytics.Services)
 }
 
+func (app *Application) initTokens() {
+	app.Tokens.Repos = security.NewMySQLTokenRepository(app.Database.DB)
+	app.Tokens.Services = security.NewTokenService(app.Tokens.Repos)
+}
+
 func (app *Application) initUsers() {
 	app.Users.Mailer = app.Mailer.Sender
 	app.Users.Repos = users.NewMySQLRepository(app.Database.DB)
-	app.Users.Services = users.NewService(app.Users.Repos, app.Mailer.Sender)
+	app.Users.Services = users.NewService(app.Users.Repos, app.Mailer.Sender, app.Tokens.Services)
 	app.Users.Handlers = users.NewHandler(app.Users.Services, app.Sessions)
 }
 
@@ -207,6 +217,7 @@ func NewApp() (*Application, error) {
 	app.initMovements()
 	app.initReports()
 	app.initAnalytics()
+	app.initTokens()
 	app.initUsers()
 	app.initSecurity()
 

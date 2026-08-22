@@ -1,4 +1,4 @@
-package data
+package security
 
 import (
 	"crypto/rand"
@@ -18,11 +18,11 @@ type Token struct {
 	Scope     string
 }
 
-// GenerateToken builds a token for the user with the given TTL and scope. The
+// generateToken builds a token for the user with the given TTL and scope. The
 // plaintext is a high-entropy random string (sent to the user, never stored);
 // only its SHA-256 hash is persisted. It returns no error: rand.Text panics if
 // the system RNG fails, which is fatal.
-func GenerateToken(userID int, ttl time.Duration, scope string) *Token {
+func generateToken(userID int, ttl time.Duration, scope string) *Token {
 	token := &Token{
 		Plaintext: rand.Text(),
 		UserID:    userID,

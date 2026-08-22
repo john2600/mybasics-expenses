@@ -13,6 +13,7 @@ type Repository interface {
 	GetUserID(ctx context.Context, m *User) (int, error)
 	GetUserByEmail(ctx context.Context, email string) (*User, error)
 	UpdatePassword(ctx context.Context, userId int, newPassowrd []byte) error
+	Activate(ctx context.Context, userID int) error
 }
 
 type mysqlRepository struct {
@@ -21,6 +22,27 @@ type mysqlRepository struct {
 
 func NewMySQLRepository(db *sql.DB) Repository {
 	return &mysqlRepository{db: db}
+}
+
+// Activate marks a user as activated. Returns ErrNoRecord when no user matches.
+func (r *mysqlRepository) Activate(ctx context.Context, userID int) error {
+	const q = `UPDATE users SET activated = 1 WHERE id = ?`
+
+	res, err := r.db.ExecContext(ctx, q, userID)
+	if err != nil {
+		return fmt.Errorf("activating user: %w", err)
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
+
+	if rows == 0 {
+		return ErrNoRecord
+	}
+
+	return nil
 }
 
 // Create persists a new user. The password must already be hashed into
