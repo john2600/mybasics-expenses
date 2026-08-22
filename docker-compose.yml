@@ -42,6 +42,15 @@ services:
       DB_USER: mybasics_user
       DB_PASSWORD: secret
       DB_NAME: mybasics_expenses
+      # Outbound email via Mailtrap sandbox (hosted SMTP that traps messages in a
+      # web inbox — no local mail server needed). Host/port default to Mailtrap;
+      # the credentials are secret, so they come from a local .env (gitignored),
+      # substituted here. Leave SMTP_USERNAME empty to disable sending.
+      SMTP_HOST: ${SMTP_HOST:-sandbox.smtp.mailtrap.io}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-MyBasics-Expenses <no-reply@mybasics.local>}
     ports:
       - "8081:8081"
     networks:

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/alexedwards/scs/mysqlstore"
@@ -13,6 +14,7 @@ import (
 	"github.com/jscodelab/mybasics-expenses/internal/balance"
 	"github.com/jscodelab/mybasics-expenses/internal/category"
 	"github.com/jscodelab/mybasics-expenses/internal/incomes"
+	"github.com/jscodelab/mybasics-expenses/internal/mailer"
 	"github.com/jscodelab/mybasics-expenses/internal/movement"
 	"github.com/jscodelab/mybasics-expenses/internal/platform/database"
 	"github.com/jscodelab/mybasics-expenses/internal/reports"
@@ -31,6 +33,12 @@ type Application struct {
 
 	Database struct {
 		DB *sql.DB
+	}
+
+	// Mailer sends outbound email (e.g. via Mailtrap sandbox in dev). Behind the
+	// mailer.Mailer interface, so consumers depend on the abstraction.
+	Mailer struct {
+		Sender mailer.Mailer
 	}
 
 	Incomes struct {
@@ -70,6 +78,7 @@ type Application struct {
 	}
 
 	Users struct {
+		Mailer   mailer.Mailer
 		Repos    users.Repository
 		Services users.Service
 		Handlers *users.Handler
@@ -79,6 +88,11 @@ type Application struct {
 	// session manager.
 	Security struct {
 		Handlers *security.Security
+	}
+
+	Tokens struct {
+		Repos    security.TokenRepository
+		Services security.TokenService
 	}
 }
 
@@ -97,6 +111,27 @@ func (app *Application) initDataBase() error {
 	// Keep the pool open for the app's lifetime — do NOT db.Close() here (the
 	// caller closes it at shutdown).
 	app.Database.DB = db
+	return nil
+}
+
+func (app *Application) initMailer() error {
+	port, err := strconv.Atoi(getEnv("SMTP_PORT", "587"))
+	if err != nil {
+		return fmt.Errorf("invalid SMTP_PORT: %w", err)
+	}
+	// New only builds the client; it does not dial. Missing credentials fail
+	// later on Send, not at startup, so the app boots even without SMTP set.
+	m, err := mailer.New(mailer.Config{
+		Host:     getEnv("SMTP_HOST", "sandbox.smtp.mailtrap.io"),
+		Port:     port,
+		Username: getEnv("SMTP_USERNAME", ""),
+		Password: getEnv("SMTP_PASSWORD", ""),
+		From:     getEnv("SMTP_FROM", "MyBasics-Expenses <no-reply@example.com>"),
+	})
+	if err != nil {
+		return fmt.Errorf("initializing mailer: %w", err)
+	}
+	app.Mailer.Sender = m
 	return nil
 }
 
@@ -145,9 +180,15 @@ func (app *Application) initAnalytics() {
 	app.Analytics.Handlers = analytics.NewHandler(app.Analytics.Services)
 }
 
+func (app *Application) initTokens() {
+	app.Tokens.Repos = security.NewMySQLTokenRepository(app.Database.DB)
+	app.Tokens.Services = security.NewTokenService(app.Tokens.Repos)
+}
+
 func (app *Application) initUsers() {
+	app.Users.Mailer = app.Mailer.Sender
 	app.Users.Repos = users.NewMySQLRepository(app.Database.DB)
-	app.Users.Services = users.NewService(app.Users.Repos)
+	app.Users.Services = users.NewService(app.Users.Repos, app.Mailer.Sender, app.Tokens.Services)
 	app.Users.Handlers = users.NewHandler(app.Users.Services, app.Sessions)
 }
 
@@ -166,12 +207,17 @@ func NewApp() (*Application, error) {
 	}
 	app.initSessions()
 
+	if err := app.initMailer(); err != nil {
+		return nil, err
+	}
+
 	app.initIncomes()
 	app.initBalances()
 	app.initCategories()
 	app.initMovements()
 	app.initReports()
 	app.initAnalytics()
+	app.initTokens()
 	app.initUsers()
 	app.initSecurity()
 
