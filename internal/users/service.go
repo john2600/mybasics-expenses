@@ -78,7 +78,7 @@ func (s *service) ChangePassword(ctx context.Context, req ChangePasswordRequest)
 	resp, err := s.repo.GetUserByEmail(ctx, req.LoginRequest.Email)
 
 	if err != nil {
-		return fmt.Errorf("Error updating password  %w", err)
+		return fmt.Errorf("error updating password: %w", err)
 	}
 
 	err = ComparePassword(resp.HashedPassword, req.LoginRequest.Password)

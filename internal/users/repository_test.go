@@ -15,7 +15,7 @@ func TestGetUserByEmail_ReturnsFullRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("opening sqlmock: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := NewMySQLRepository(db)
 
@@ -67,7 +67,7 @@ func TestUpdatePassword_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("opening sqlmock: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := NewMySQLRepository(db)
 
@@ -92,7 +92,7 @@ func TestUpdatePassword_NoRowsAffected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("opening sqlmock: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := NewMySQLRepository(db)
 
@@ -117,7 +117,7 @@ func TestGetUserByEmail_NotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("opening sqlmock: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := NewMySQLRepository(db)
 

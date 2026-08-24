@@ -35,7 +35,7 @@ func (r *mysqlRepository) FindAll(ctx context.Context) ([]Category, error) {
 	if err != nil {
 		return nil, fmt.Errorf("querying categories: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var categories []Category
 	for rows.Next() {

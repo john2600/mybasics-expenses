@@ -61,7 +61,7 @@ func (r *mysqlRepository) ByCategory(ctx context.Context, userID int, from, to t
 	if err != nil {
 		return nil, fmt.Errorf("querying by-category: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var cats []CategoryBreakdown
 	for rows.Next() {
@@ -86,7 +86,7 @@ func (r *mysqlRepository) Trend(ctx context.Context, userID int, from, to time.T
 	if err != nil {
 		return nil, fmt.Errorf("querying trend: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var points []TrendPoint
 	for rows.Next() {
@@ -112,7 +112,7 @@ func (r *mysqlRepository) TopExpenses(ctx context.Context, userID int, from, to 
 	if err != nil {
 		return nil, fmt.Errorf("querying top expenses: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var expenses []TopExpense
 	for rows.Next() {
@@ -142,7 +142,7 @@ func (r *mysqlRepository) IncomeVsExpense(ctx context.Context, userID int, from,
 	if err != nil {
 		return nil, fmt.Errorf("querying income-vs-expense: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var months []MonthIVE
 	for rows.Next() {

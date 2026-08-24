@@ -35,7 +35,7 @@ func (r *mysqlRepository) QueryExpenses(ctx context.Context, userID int, from, t
 	if err != nil {
 		return nil, fmt.Errorf("querying expenses for export: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var expenses []ExportRow
 	for rows.Next() {
@@ -62,7 +62,7 @@ func (r *mysqlRepository) MonthlySummary(ctx context.Context, userID int, from, 
 	if err != nil {
 		return nil, fmt.Errorf("querying monthly summary: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var summaries []MonthlySummary
 	for rows.Next() {
