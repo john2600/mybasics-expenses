@@ -180,14 +180,21 @@ func (app *Application) initAnalytics() {
 	app.Analytics.Handlers = analytics.NewHandler(app.Analytics.Services)
 }
 
-func (app *Application) initTokens() {
-	app.Tokens.Repos = security.NewMySQLTokenRepository(app.Database.DB)
-	app.Tokens.Services = security.NewTokenService(app.Tokens.Repos)
-}
-
 func (app *Application) initUsers() {
 	app.Users.Mailer = app.Mailer.Sender
 	app.Users.Repos = users.NewMySQLRepository(app.Database.DB)
+}
+
+func (app *Application) initTokens() {
+	// The token service looks up users by email via a UserFinder adapter, so it
+	// needs the users repository (initUsers) to run first.
+	app.Tokens.Repos = security.NewMySQLTokenRepository(app.Database.DB)
+	app.Tokens.Services = security.NewTokenService(app.Tokens.Repos, users.NewUserFinder(app.Users.Repos))
+}
+
+func (app *Application) initUserService() {
+	// The user service depends on the token service (activation flow), so this
+	// runs after initTokens.
 	app.Users.Services = users.NewService(app.Users.Repos, app.Mailer.Sender, app.Tokens.Services)
 	app.Users.Handlers = users.NewHandler(app.Users.Services, app.Sessions)
 }
@@ -217,8 +224,9 @@ func NewApp() (*Application, error) {
 	app.initMovements()
 	app.initReports()
 	app.initAnalytics()
-	app.initTokens()
 	app.initUsers()
+	app.initTokens()
+	app.initUserService()
 	app.initSecurity()
 
 	return app, nil

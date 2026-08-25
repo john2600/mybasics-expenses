@@ -7,6 +7,7 @@ import (
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
+	"github.com/jscodelab/mybasics-expenses/internal/data"
 	"github.com/jscodelab/mybasics-expenses/internal/security"
 	"github.com/jscodelab/mybasics-expenses/pkg/response"
 )
@@ -96,7 +97,7 @@ func (h *Handler) updatePassword(w http.ResponseWriter, r *http.Request) {
 // login authenticates a user and stores their id in the session.
 // POST /api/v1/user/login
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
-	var req LoginRequest
+	var req data.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.BadRequest(w, err)
 		return
