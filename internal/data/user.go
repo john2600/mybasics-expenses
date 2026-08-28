@@ -4,7 +4,11 @@
 // importing the users package.
 package data
 
-import "errors"
+import (
+	"errors"
+
+	"golang.org/x/crypto/bcrypt"
+)
 
 // maxPasswordBytes caps the password length: bcrypt refuses passwords longer
 // than 72 bytes, so LoginRequest.Validate rejects them up front. Kept here with
@@ -20,13 +24,33 @@ type User struct {
 	Name           string
 	Email          string
 	Activated      bool
+	Password       Password
 	HashedPassword []byte
+	version        int
 }
 
 // LoginRequest is the payload for authenticating an existing user.
 type LoginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+}
+
+type Password struct {
+	plaintext *string
+	hash      []byte
+}
+
+func (p *Password) Matches(plaintextPassword string) (bool, error) {
+	err := bcrypt.CompareHashAndPassword(p.hash, []byte(plaintextPassword))
+	if err != nil {
+		switch {
+		case errors.Is(err, bcrypt.ErrMismatchedHashAndPassword):
+			return false, nil
+		default:
+			return false, err
+		}
+	}
+	return true, nil
 }
 
 func (u *LoginRequest) Validate() error {

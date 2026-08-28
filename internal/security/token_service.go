@@ -64,12 +64,29 @@ func (s *tokenService) GetForToken(ctx context.Context, scope string, tokenPlain
 
 func (s *tokenService) CreateAuthentication(ctx context.Context, request data.LoginRequest) (Token, error) {
 	// TODO: not implemented yet — stubbed so the package compiles.
-
 	err := request.Validate()
 	if err != nil {
 		return Token{}, err
 	}
 
 	// TODO call finder to get user data
+	user, err := s.users.GetUserByEmail(ctx, request.Email)
+
+	if err != nil {
+		return Token{}, err
+	}
+
+	match, err := user.Password.Matches(request.Password)
+	if err != nil {
+		return Token{}, err
+	}
+
+	if !match {
+		return Token{}, err
+	}
+
+	s.New(ctx, user.ID, 24*time.Hour, ScopeAuthentication)
+	
+
 	return Token{}, nil
 }
