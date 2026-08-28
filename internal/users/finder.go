@@ -2,6 +2,7 @@ package users
 
 import (
 	"context"
+	"errors"
 
 	"github.com/jscodelab/mybasics-expenses/internal/data"
 	"github.com/jscodelab/mybasics-expenses/internal/security"
@@ -22,6 +23,11 @@ func NewUserFinder(repo Repository) security.UserFinder {
 func (f *userFinder) GetUserByEmail(ctx context.Context, email string) (*data.User, error) {
 	u, err := f.repo.GetUserByEmail(ctx, email)
 	if err != nil {
+		// Translate the users-package "no record" sentinel into the security one
+		// so the security package can detect it without importing users.
+		if errors.Is(err, ErrNoRecord) {
+			return nil, security.ErrUserNotFound
+		}
 		return nil, err
 	}
 	return &data.User{
@@ -31,5 +37,6 @@ func (f *userFinder) GetUserByEmail(ctx context.Context, email string) (*data.Us
 		Email:          u.Email,
 		Activated:      u.Activated,
 		HashedPassword: u.HashedPassword,
+		Password:       data.NewPassword(u.HashedPassword),
 	}, nil
 }

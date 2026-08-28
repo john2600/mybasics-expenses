@@ -30,6 +30,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Post("/user", h.create)
 	r.Post("/user/login", h.login)
 	r.Get("/user/activate", h.activate)
+	r.Post("/tokens/authentication", h.createAuthenticationToken)
 }
 
 // RegisterProtectedRoutes registers user routes that require an active session.
@@ -56,6 +57,31 @@ func (h *Handler) activate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.Success(w, "account activated")
+}
+
+// createAuthenticationToken verifies credentials and returns a fresh
+// authentication token in the response body.
+// On bad credentials it returns 401 with a generic message (it never reveals
+// whether the email exists). POST /api/v1/tokens/authentication
+func (h *Handler) createAuthenticationToken(w http.ResponseWriter, r *http.Request) {
+	var req data.LoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.BadRequest(w, err)
+		return
+	}
+
+	token, err := h.svc.CreateAuthenticationToken(r.Context(), req)
+	if err != nil {
+		if errors.Is(err, security.ErrInvalidCredentials) {
+			response.Unauthorized(w, errors.New("invalid email or password"))
+			return
+		}
+		response.InternalError(w, err)
+		return
+	}
+
+	// Encode the token to JSON and send it with a 201 Created status code.
+	response.Created(w, map[string]any{"authentication_token": token})
 }
 
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {

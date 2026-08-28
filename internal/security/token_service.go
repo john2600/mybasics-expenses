@@ -3,6 +3,7 @@ package security
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"time"
 
 	"github.com/jscodelab/mybasics-expenses/internal/data"
@@ -62,17 +63,22 @@ func (s *tokenService) GetForToken(ctx context.Context, scope string, tokenPlain
 	return s.repo.GetForToken(ctx, scope, hash[:])
 }
 
+// CreateAuthentication verifies a login request and, on success, issues an
+// authentication-scoped token. On failure it returns ErrInvalidCredentials — the
+// same generic error whether the email is unknown or the password is wrong — so
+// the response never reveals which accounts exist (avoids user enumeration).
+// Genuine infrastructure errors are propagated unchanged (never masked as
+// invalid credentials) so the caller can distinguish "wrong login" from "broken".
 func (s *tokenService) CreateAuthentication(ctx context.Context, request data.LoginRequest) (Token, error) {
-	// TODO: not implemented yet — stubbed so the package compiles.
-	err := request.Validate()
-	if err != nil {
+	if err := request.Validate(); err != nil {
 		return Token{}, err
 	}
 
-	// TODO call finder to get user data
 	user, err := s.users.GetUserByEmail(ctx, request.Email)
-
 	if err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			return Token{}, ErrInvalidCredentials
+		}
 		return Token{}, err
 	}
 
@@ -80,13 +86,13 @@ func (s *tokenService) CreateAuthentication(ctx context.Context, request data.Lo
 	if err != nil {
 		return Token{}, err
 	}
-
 	if !match {
-		return Token{}, err
+		return Token{}, ErrInvalidCredentials
 	}
 
-	s.New(ctx, user.ID, 24*time.Hour, ScopeAuthentication)
-	
-
-	return Token{}, nil
+	token, err := s.New(ctx, user.ID, 24*time.Hour, ScopeAuthentication)
+	if err != nil {
+		return Token{}, err
+	}
+	return *token, nil
 }

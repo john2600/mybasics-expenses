@@ -15,18 +15,20 @@ import (
 // the moved LoginRequest; the users package keeps its own copy for its requests.
 const maxPasswordBytes = 72
 
+var AnonymousUser = &User{}
+
 // User is the shared user view returned by cross-package lookups (e.g. the
 // token → user join in security). It is intentionally light; the users package
 // keeps its own richer model for user CRUD.
 type User struct {
-	ID             int
+	ID             int `json:"id"`
 	Username       string
-	Name           string
-	Email          string
-	Activated      bool
-	Password       Password
+	Name           string   `json:"name"`
+	Email          string   `json:"email"`
+	Activated      bool     `json:"activated"`
+	Password       Password `json:"-"`
 	HashedPassword []byte
-	version        int
+	version        int `json:"-"`
 }
 
 // LoginRequest is the payload for authenticating an existing user.
@@ -38,6 +40,13 @@ type LoginRequest struct {
 type Password struct {
 	plaintext *string
 	hash      []byte
+}
+
+// NewPassword wraps an existing bcrypt hash into a Password. Callers outside this
+// package can't set the unexported hash field directly, so the users finder uses
+// this to build a Password from a stored hash.
+func NewPassword(hash []byte) Password {
+	return Password{hash: hash}
 }
 
 func (p *Password) Matches(plaintextPassword string) (bool, error) {
@@ -68,4 +77,8 @@ func (u *LoginRequest) Validate() error {
 		return errors.New("password no puede superar los 72 caracteres")
 	}
 	return nil
+}
+
+func (u *User) IsAnonymous() bool {
+	return u == AnonymousUser
 }

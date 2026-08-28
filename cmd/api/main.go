@@ -27,6 +27,7 @@ func run() error {
 	_ = godotenv.Load()
 
 	app, err := NewApp()
+
 	if err != nil {
 		return err
 	}
