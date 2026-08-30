@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jscodelab/mybasics-expenses/internal/data"
 	"github.com/jscodelab/mybasics-expenses/internal/mailer"
 	"github.com/jscodelab/mybasics-expenses/internal/security"
 )
@@ -28,7 +27,6 @@ type Service interface {
 	ChangePassword(ctx context.Context, req ChangePasswordRequest) error
 	Authenticate(ctx context.Context, user, password string) (int, error)
 	ActiveUser(ctx context.Context, tokenPlainText string) error
-	CreateAuthenticationToken(ctx context.Context, req data.LoginRequest) (security.Token, error)
 }
 
 func (s *service) InsertUser(ctx context.Context, req UserRequest) error {
@@ -123,13 +121,6 @@ func (s *service) ActiveUser(ctx context.Context, tokenPlain string) error {
 	}
 
 	return s.tokens.DeleteAllTokensUser(ctx, security.ScopeActivation, user.ID)
-}
-
-// CreateAuthenticationToken verifies the login request and returns a fresh
-// authentication token. It delegates to the token service, which returns
-// security.ErrInvalidCredentials on a bad email/password.
-func (s *service) CreateAuthenticationToken(ctx context.Context, req data.LoginRequest) (security.Token, error) {
-	return s.tokens.CreateAuthentication(ctx, req)
 }
 
 func (s *service) Exists(id int) (bool, error) {

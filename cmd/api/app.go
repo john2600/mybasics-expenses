@@ -88,6 +88,7 @@ type Application struct {
 	// session manager.
 	Security struct {
 		Handlers *security.Security
+		Auth     *security.AuthHandler
 	}
 
 	Tokens struct {
@@ -201,6 +202,9 @@ func (app *Application) initUserService() {
 
 func (app *Application) initSecurity() {
 	app.Security.Handlers = security.NewHandler(app.Sessions)
+	// New token-based authentication endpoints. Needs the token service
+	// (initTokens), which runs before initSecurity.
+	app.Security.Auth = security.NewAuthHandler(app.Tokens.Services)
 }
 
 // NewApp builds and wires the whole application in dependency order: DB and

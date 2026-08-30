@@ -28,6 +28,8 @@ func NewRouter(app *Application) http.Handler {
 	r.Route("/api/v1", func(r chi.Router) {
 		// Public.
 		app.Users.Handlers.RegisterRoutes(r)
+		// New token-based authentication (legacy session login stays in users).
+		app.Security.Auth.RegisterRoutes(r)
 
 		// Session-protected.
 		r.Group(func(r chi.Router) {

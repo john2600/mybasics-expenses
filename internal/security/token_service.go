@@ -94,5 +94,6 @@ func (s *tokenService) CreateAuthentication(ctx context.Context, request data.Lo
 	if err != nil {
 		return Token{}, err
 	}
+
 	return *token, nil
 }
