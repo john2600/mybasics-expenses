@@ -67,6 +67,13 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 
 	err := h.svc.InsertUser(r.Context(), req)
 	if err != nil {
+		// Duplicate username/email gets a clean, generic 400 (the repository
+		// already stripped the raw DB error). Other errors — validation
+		// messages — keep their existing 400 behaviour.
+		if errors.Is(err, ErrDuplicateUser) {
+			response.BadRequest(w, ErrDuplicateUser)
+			return
+		}
 		response.BadRequest(w, err)
 		return
 	}

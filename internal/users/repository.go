@@ -6,7 +6,13 @@ import (
 	"fmt"
 
 	"errors"
+
+	"github.com/go-sql-driver/mysql"
 )
+
+// mysqlErrDuplicateEntry is MySQL's error number for a unique-constraint
+// violation (ER_DUP_ENTRY).
+const mysqlErrDuplicateEntry = 1062
 
 type Repository interface {
 	Create(ctx context.Context, m *User) error
@@ -52,6 +58,13 @@ func (r *mysqlRepository) Create(ctx context.Context, user *User) error {
 
 	res, err := r.db.ExecContext(ctx, q, user.User, user.Name, user.Email, user.HashedPassword)
 	if err != nil {
+		// Map a unique-constraint violation to a generic sentinel so the raw DB
+		// error (engine, table/index names, the offending value) is never
+		// surfaced to the client.
+		var myErr *mysql.MySQLError
+		if errors.As(err, &myErr) && myErr.Number == mysqlErrDuplicateEntry {
+			return ErrDuplicateUser
+		}
 		return fmt.Errorf("inserting user: %w", err)
 	}
 

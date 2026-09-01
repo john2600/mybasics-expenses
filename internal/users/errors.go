@@ -12,4 +12,9 @@ var (
 	// Add a new ErrDuplicateEmail error. We'll use this later if a user
 	// tries to signup with an email address that's already in use.
 	ErrDuplicateEmail = errors.New("models: duplicate email")
+	// ErrDuplicateUser is returned when a unique constraint (username or email)
+	// is violated on insert. It is deliberately generic — it never says which
+	// field nor exposes the underlying DB error — to avoid leaking schema
+	// details or enabling account enumeration.
+	ErrDuplicateUser = errors.New("username or email already in use")
 )
