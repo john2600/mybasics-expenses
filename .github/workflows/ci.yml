@@ -47,7 +47,10 @@ jobs:
           git diff --exit-code go.mod go.sum
 
       - name: Lint
-        uses: golangci/golangci-lint-action@v6
+        # v7 installs golangci-lint v2, which is built with a recent Go toolchain
+        # (>= 1.25). v6 only installs v1.x (latest 1.64.x is built with go1.24),
+        # which refuses to run against a module targeting go 1.25.
+        uses: golangci/golangci-lint-action@v7
         with:
           version: latest
 
