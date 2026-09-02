@@ -36,7 +36,7 @@ jobs:
       # dependencies are downloaded once and later runs are noticeably faster.
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.25"
           cache: true
 
       # go.mod/go.sum must be tidy: `go mod tidy` then fail if it changed
@@ -47,7 +47,10 @@ jobs:
           git diff --exit-code go.mod go.sum
 
       - name: Lint
-        uses: golangci/golangci-lint-action@v6
+        # v7 installs golangci-lint v2, which is built with a recent Go toolchain
+        # (>= 1.25). v6 only installs v1.x (latest 1.64.x is built with go1.24),
+        # which refuses to run against a module targeting go 1.25.
+        uses: golangci/golangci-lint-action@v7
         with:
           version: latest
 
@@ -62,7 +65,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.25"
           cache: true
 
       # -race finds data races; -covermode=atomic is required for accurate
@@ -111,7 +114,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.25"
           cache: true
 
       - name: Build
@@ -131,7 +134,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.25"
           cache: true
 
       - name: govulncheck

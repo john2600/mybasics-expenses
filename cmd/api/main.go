@@ -27,10 +27,11 @@ func run() error {
 	_ = godotenv.Load()
 
 	app, err := NewApp()
+
 	if err != nil {
 		return err
 	}
-	defer app.Database.DB.Close()
+	defer func() { _ = app.Database.DB.Close() }()
 
 	srv := &http.Server{
 		Addr:         ":" + getEnv("PORT", "8080"),

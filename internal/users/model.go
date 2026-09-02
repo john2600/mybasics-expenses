@@ -8,6 +8,7 @@ import (
 	"net/mail"
 	"strings"
 
+	"github.com/jscodelab/mybasics-expenses/internal/data"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -16,17 +17,23 @@ import (
 const bcryptCost = 12
 
 type User struct {
-	ID   int
-	User string
-	Name string
+	ID   int    `json:"id"`
+	User string `json:"user"`
+	Name string `json:"name"`
 	// Password holds the plaintext password only transiently, between decoding
 	// the request and calling Normalize. It is never persisted (json:"-") and is
 	// cleared once hashed.
 	Password       string `json:"-"`
-	Email          string
+	Email          string `json:"email"`
 	HashedPassword []byte
 	Created        time.Time
 	Updated        time.Time
+	// TODO(ADVANCE): activated/version are backed by migration 000002 but the
+	// repository (Create/scan) and service layers do not read or write these
+	// columns yet. Wire them through before relying on them (e.g. gate login on
+	// Activated, bump Version on updates for optimistic locking).
+	Activated bool `json:"activated"`
+	Version   int  `json:"version"`
 }
 
 // ComparePassword checks a plaintext password against a stored bcrypt hash.
@@ -94,33 +101,10 @@ type UserRequest struct {
 	Password string `json:"password"`
 }
 
-// LoginRequest is the payload for authenticating an existing user.
-type LoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-func (u *LoginRequest) Validate() error {
-	if u.Email == "" {
-		return errors.New("email es obligatorio")
-	}
-
-	if u.Password == "" {
-		return errors.New("password es obligatorio")
-	}
-	if len(u.Password) < 8 {
-		return errors.New("password debe tener al menos 8 caracteres")
-	}
-	if len(u.Password) > maxPasswordBytes {
-		return errors.New("password no puede superar los 72 caracteres")
-	}
-	return nil
-}
-
 // ChangePassword is the payload for authenticating an existing user.
 type ChangePasswordRequest struct {
-	LoginRequest LoginRequest `json:"login_request"`
-	NewPassword  string       `json:"new_password"`
+	LoginRequest data.LoginRequest `json:"login_request"`
+	NewPassword  string            `json:"new_password"`
 }
 
 func (u *ChangePasswordRequest) Validate() error {

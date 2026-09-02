@@ -7,6 +7,8 @@ import (
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
+	"github.com/jscodelab/mybasics-expenses/internal/data"
+	"github.com/jscodelab/mybasics-expenses/internal/security"
 	"github.com/jscodelab/mybasics-expenses/pkg/response"
 )
 
@@ -27,6 +29,7 @@ func NewHandler(svc Service, sm *scs.SessionManager) *Handler {
 func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Post("/user", h.create)
 	r.Post("/user/login", h.login)
+	r.Get("/user/activate", h.activate)
 }
 
 // RegisterProtectedRoutes registers user routes that require an active session.
@@ -34,6 +37,25 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 func (h *Handler) RegisterProtectedRoutes(r chi.Router) {
 	r.Post("/change_password", h.updatePassword)
 	r.Post("/user/logout", h.logout)
+}
+
+// activate completes a registration from the link in the welcome email: it reads
+// the activation token from the query string and marks the account active.
+// Public (no session) — the token itself is the proof.
+// GET /api/v1/user/activate?id=..&token=..
+func (h *Handler) activate(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("token")
+
+	if err := h.svc.ActiveUser(r.Context(), token); err != nil {
+		if errors.Is(err, security.ErrTokenNotFound) {
+			response.BadRequest(w, errors.New("invalid or expired activation link"))
+			return
+		}
+		response.BadRequest(w, err)
+		return
+	}
+
+	response.Success(w, "account activated")
 }
 
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
@@ -45,6 +67,13 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 
 	err := h.svc.InsertUser(r.Context(), req)
 	if err != nil {
+		// Duplicate username/email gets a clean, generic 400 (the repository
+		// already stripped the raw DB error). Other errors — validation
+		// messages — keep their existing 400 behaviour.
+		if errors.Is(err, ErrDuplicateUser) {
+			response.BadRequest(w, ErrDuplicateUser)
+			return
+		}
 		response.BadRequest(w, err)
 		return
 	}
@@ -75,7 +104,7 @@ func (h *Handler) updatePassword(w http.ResponseWriter, r *http.Request) {
 // login authenticates a user and stores their id in the session.
 // POST /api/v1/user/login
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
-	var req LoginRequest
+	var req data.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.BadRequest(w, err)
 		return

@@ -89,7 +89,7 @@ func (r *mysqlRepository) FindAll(ctx context.Context, f Filter) ([]Movement, er
 	if err != nil {
 		return nil, fmt.Errorf("querying movements: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var movements []Movement
 	for rows.Next() {
@@ -209,7 +209,7 @@ func (r *mysqlRepository) MonthlySummary(ctx context.Context, userID int) ([]Mon
 	if err != nil {
 		return nil, fmt.Errorf("querying monthly summary: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var summaries []MonthlySummary
 	for rows.Next() {

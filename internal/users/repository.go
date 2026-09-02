@@ -6,13 +6,20 @@ import (
 	"fmt"
 
 	"errors"
+
+	"github.com/go-sql-driver/mysql"
 )
+
+// mysqlErrDuplicateEntry is MySQL's error number for a unique-constraint
+// violation (ER_DUP_ENTRY).
+const mysqlErrDuplicateEntry = 1062
 
 type Repository interface {
 	Create(ctx context.Context, m *User) error
 	GetUserID(ctx context.Context, m *User) (int, error)
 	GetUserByEmail(ctx context.Context, email string) (*User, error)
 	UpdatePassword(ctx context.Context, userId int, newPassowrd []byte) error
+	Activate(ctx context.Context, userID int) error
 }
 
 type mysqlRepository struct {
@@ -23,6 +30,27 @@ func NewMySQLRepository(db *sql.DB) Repository {
 	return &mysqlRepository{db: db}
 }
 
+// Activate marks a user as activated. Returns ErrNoRecord when no user matches.
+func (r *mysqlRepository) Activate(ctx context.Context, userID int) error {
+	const q = `UPDATE users SET activated = 1 WHERE id = ?`
+
+	res, err := r.db.ExecContext(ctx, q, userID)
+	if err != nil {
+		return fmt.Errorf("activating user: %w", err)
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
+
+	if rows == 0 {
+		return ErrNoRecord
+	}
+
+	return nil
+}
+
 // Create persists a new user. The password must already be hashed into
 // HashedPassword (done by User.Normalize) before this is called.
 func (r *mysqlRepository) Create(ctx context.Context, user *User) error {
@@ -30,6 +58,13 @@ func (r *mysqlRepository) Create(ctx context.Context, user *User) error {
 
 	res, err := r.db.ExecContext(ctx, q, user.User, user.Name, user.Email, user.HashedPassword)
 	if err != nil {
+		// Map a unique-constraint violation to a generic sentinel so the raw DB
+		// error (engine, table/index names, the offending value) is never
+		// surfaced to the client.
+		var myErr *mysql.MySQLError
+		if errors.As(err, &myErr) && myErr.Number == mysqlErrDuplicateEntry {
+			return ErrDuplicateUser
+		}
 		return fmt.Errorf("inserting user: %w", err)
 	}
 
