@@ -22,7 +22,9 @@ func NewRouter(app *Application) http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(app.Sessions.LoadAndSave)
 	r.Use(corsMiddleware)
-
+	// authenticate resolves identity (anonymous or the user behind a bearer token)
+	// for every request; ProtectEndpoint below depends on it having run.
+	r.Use(app.authenticate)
 	r.Get("/health", app.healthCheck)
 
 	r.Route("/api/v1", func(r chi.Router) {
@@ -31,9 +33,16 @@ func NewRouter(app *Application) http.Handler {
 		// New token-based authentication (legacy session login stays in users).
 		app.Security.Auth.RegisterRoutes(r)
 
-		// Session-protected.
+		// Protected group. Both guards feed the same userIDKey, so handlers
+		// (RequireUserID) don't care which one ran:
+		//   - RestrictEndpoint (legacy) sources the id from the session cookie.
+		//   - ProtectEndpoint  (new)    sources it from the bearer token via the
+		//     global authenticate middleware.
 		r.Group(func(r chi.Router) {
-			r.Use(app.Security.Handlers.RestrictEndpoint)
+
+			// Legacy session guard — kept for reference while migrating.
+			// r.Use(app.Security.Handlers.RestrictEndpoint)
+			r.Use(app.Security.Handlers.ProtectEndpoint)
 			app.Users.Handlers.RegisterProtectedRoutes(r)
 			app.Movements.Handlers.RegisterRoutes(r)
 			app.Balances.Handlers.RegisterRoutes(r)
@@ -41,6 +50,7 @@ func NewRouter(app *Application) http.Handler {
 			app.Reports.Handlers.RegisterRoutes(r)
 			app.Incomes.Handlers.RegisterRoutes(r)
 			app.Categories.Handlers.RegisterRoutes(r)
+
 		})
 	})
 
