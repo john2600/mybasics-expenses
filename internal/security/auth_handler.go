@@ -29,6 +29,31 @@ func (h *AuthHandler) RegisterRoutes(r chi.Router) {
 	r.Post("/tokens/authentication", h.createAuthenticationToken)
 }
 
+// RegisterProtectedRoutes registers auth routes that require a valid token.
+// Mount this inside the ProtectEndpoint group.
+func (h *AuthHandler) RegisterProtectedRoutes(r chi.Router) {
+	r.Post("/tokens/logout", h.logout)
+}
+
+// logout is the token-world logout: it deletes all of the current user's
+// authentication tokens, so every issued token stops working (logs the user out
+// of all devices). The user is identified from the context (populated by
+// ProtectEndpoint), never from the request body.
+// POST /api/v1/tokens/logout
+func (h *AuthHandler) logout(w http.ResponseWriter, r *http.Request) {
+	userID, ok := RequireUserID(w, r)
+	if !ok {
+		return
+	}
+
+	if err := h.tokens.DeleteAllTokensUser(r.Context(), ScopeAuthentication, userID); err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, "logged out")
+}
+
 // createAuthenticationToken verifies credentials and returns a fresh
 // authentication token in the response body. On bad credentials it returns 401
 // with a generic message (it never reveals whether the email exists).

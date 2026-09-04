@@ -43,6 +43,7 @@ func NewRouter(app *Application) http.Handler {
 			// Legacy session guard — kept for reference while migrating.
 			// r.Use(app.Security.Handlers.RestrictEndpoint)
 			r.Use(app.Security.Handlers.ProtectEndpoint)
+			app.Security.Auth.RegisterProtectedRoutes(r)
 			app.Users.Handlers.RegisterProtectedRoutes(r)
 			app.Movements.Handlers.RegisterRoutes(r)
 			app.Balances.Handlers.RegisterRoutes(r)

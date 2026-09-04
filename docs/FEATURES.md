@@ -22,6 +22,7 @@ now validate the token, not the cookie.
 | POST | `/user` | Public | Register a user; issues an activation token + welcome email |
 | GET | `/user/activate` | Public (token in query) | Activate the account via the emailed link |
 | POST | `/tokens/authentication` | Public | **Login**: verify `email`+`password`, return an `authentication_token` (24 h) |
+| POST | `/tokens/logout` | Bearer | **Logout**: delete all the user's authentication tokens (logs out every device) |
 | POST | `/change_password` | Bearer | Change password; re-verifies the current password |
 | POST | `/user/login` | Public | *(Legacy)* cookie-session login — being deprecated |
 | POST | `/user/logout` | Session | *(Legacy)* destroy the cookie session |

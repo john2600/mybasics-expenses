@@ -317,6 +317,7 @@ un token** con email + password, y enviar ese token en la cabecera
 | POST | `/user` | Pública | Registra un usuario. Emite un token de activación y envía el correo de bienvenida |
 | GET  | `/user/activate` | Pública (token en query) | Activa la cuenta con el token del enlace del correo |
 | POST | `/tokens/authentication` | Pública | **Login nuevo**: verifica email+password y devuelve un `authentication_token` |
+| POST | `/tokens/logout` | Protegida | **Logout nuevo**: borra los tokens de autenticación del usuario (cierra sesión en todos los dispositivos) |
 | POST | `/change_password` | Protegida | Cambia la contraseña (re-verifica la actual) |
 | POST | `/user/login` | Pública | *(Legacy)* login por cookie de sesión — en deprecación |
 | POST | `/user/logout` | Protegida | *(Legacy)* cierra la sesión de cookie |
@@ -344,6 +345,11 @@ corto) → `400`.
 **Usar el token** — enviar en cada petición protegida:
 `Authorization: Bearer <token>`. El middlware `authenticate` resuelve el usuario;
 `ProtectEndpoint` exige que **no** sea anónimo.
+
+**Logout (token)** — `POST /tokens/logout` con `Authorization: Bearer <token>`.
+Borra **todos** los tokens de autenticación del usuario (no solo el actual), por lo
+que cierra la sesión en todos los dispositivos. Éxito → `200 { "data": "logged out" }`.
+No hay estado que invalidar del lado del cliente más allá de descartar el token.
 
 **Cambio de contraseña** — protegida, y re-verifica la contraseña actual en el body:
 ```json
