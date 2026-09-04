@@ -14,8 +14,9 @@ convierte en balances, reportes y analíticas.
 Overview of what the API does (full catalog in
 [`docs/FEATURES.md`](docs/FEATURES.md)):
 
-- **Users & authentication** — registration, session login/logout (cookie),
-  change password; passwords hashed with bcrypt.
+- **Users & authentication** — registration with email activation, **token-based
+  login** (`Authorization: Bearer`), change password; passwords hashed with bcrypt.
+  (Legacy cookie-session login is being deprecated.)
 - **Movements** — CRUD of income/expenses, list grouped by category, flat expenses
   list **with total**, monthly summary; filters by category, type and dates.
 - **Categories** — CRUD (shared across users).
@@ -302,30 +303,55 @@ Base URL: `http://localhost:8080/api/v1`
 
 ### Autenticación
 
-La API usa **sesiones del lado del servidor** (cookie `session`, store en MySQL vía
-`alexedwards/scs`). El flujo es: registrar un usuario, iniciar sesión, y usar la
-cookie recibida en las peticiones a los endpoints protegidos.
+La API usa **autenticación por token** (Bearer). El flujo es: registrar un
+usuario, **activar** la cuenta con el enlace del correo de bienvenida, **obtener
+un token** con email + password, y enviar ese token en la cabecera
+`Authorization: Bearer <token>` en cada petición a un endpoint protegido.
 
-| Método | Ruta               | Auth            | Descripción                                            |
-|--------|--------------------|-----------------|--------------------------------------------------------|
-| POST   | `/user`            | Pública         | Registra un usuario (contraseña con bcrypt, nunca en claro) |
-| POST   | `/user/login`      | Pública         | Inicia sesión; guarda el `id` del usuario en la sesión y devuelve la cookie |
-| POST   | `/user/logout`     | Requiere sesión | Cierra la sesión actual (la destruye y expira la cookie) |
-| POST   | `/change_password` | Requiere sesión | Cambia la contraseña del usuario (verifica la actual)  |
+> El login por **cookie de sesión** (`/user/login`, `alexedwards/scs`) sigue
+> existiendo pero está **en proceso de deprecación**: los endpoints protegidos ya
+> validan el **token**, no la cookie.
+
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| POST | `/user` | Pública | Registra un usuario. Emite un token de activación y envía el correo de bienvenida |
+| GET  | `/user/activate` | Pública (token en query) | Activa la cuenta con el token del enlace del correo |
+| POST | `/tokens/authentication` | Pública | **Login nuevo**: verifica email+password y devuelve un `authentication_token` |
+| POST | `/tokens/logout` | Protegida | **Logout nuevo**: borra los tokens de autenticación del usuario (cierra sesión en todos los dispositivos) |
+| POST | `/change_password` | Protegida | Cambia la contraseña (re-verifica la actual) |
+| POST | `/user/login` | Pública | *(Legacy)* login por cookie de sesión — en deprecación |
+| POST | `/user/logout` | Protegida | *(Legacy)* cierra la sesión de cookie |
 
 **Registro** — body `{ "username", "name", "email", "password" }`.
-`password` debe tener entre 8 y 72 caracteres. `username` y `email` son únicos.
-Respuesta `201` `{ "data": "user created" }`.
+`password` entre 8 y 72 caracteres; `username` y `email` únicos.
+Respuesta `201` `{ "data": "user created" }`. Al registrar se genera un **token de
+activación** (válido 3 días) y se envía por correo. `username`/`email` duplicados →
+`400 { "error": "username or email already in use" }`.
 
-**Login** — body `{ "email", "password" }`. Respuesta `200` + cookie `session`
-(`HttpOnly`). Credenciales inválidas → `401 { "error": "invalid email or password" }`.
+**Activación** — `GET /user/activate?token=<token>` (el enlace llega en el correo
+de bienvenida). Éxito → `200 { "data": "account activated" }`; token inválido o
+expirado → `400 { "error": "invalid or expired activation link" }`.
 
-**Logout** — sin body, envía la cookie de sesión. Respuesta `200`. Destruye la
-sesión asociada a **esa** cookie (identificada por su token, no por el `id` del
-usuario), por lo que sólo cierra la sesión de ese dispositivo. Sin sesión → `401`.
+**Login (token)** — `POST /tokens/authentication`, body `{ "email", "password" }`.
+Éxito → `201`:
+```json
+{ "data": { "authentication_token": { "token": "…", "expiry": "2026-01-02T03:04:05Z" } } }
+```
+El token dura **24 h**. Credenciales inválidas (email inexistente **o** password
+incorrecto → mismo error, para no revelar qué cuentas existen) →
+`401 { "error": "invalid email or password" }`. Validación (campos vacíos, password
+corto) → `400`.
 
-**Cambio de contraseña** — requiere sesión activa **y** re-verifica la contraseña
-actual en el body. Body:
+**Usar el token** — enviar en cada petición protegida:
+`Authorization: Bearer <token>`. El middlware `authenticate` resuelve el usuario;
+`ProtectEndpoint` exige que **no** sea anónimo.
+
+**Logout (token)** — `POST /tokens/logout` con `Authorization: Bearer <token>`.
+Borra **todos** los tokens de autenticación del usuario (no solo el actual), por lo
+que cierra la sesión en todos los dispositivos. Éxito → `200 { "data": "logged out" }`.
+No hay estado que invalidar del lado del cliente más allá de descartar el token.
+
+**Cambio de contraseña** — protegida, y re-verifica la contraseña actual en el body:
 ```json
 {
   "login_request": { "email": "john@example.com", "password": "currentPass123" },
@@ -333,14 +359,15 @@ actual en el body. Body:
 }
 ```
 Reglas: `new_password` entre 8 y 72 caracteres y **distinta** de la actual.
-Respuestas: `200 { "data": "password updated" }` en éxito; `400` si la contraseña
-actual no coincide o falla la validación; `401` si no hay sesión.
+`200 { "data": "password updated" }` en éxito; `400` si no coincide o falla la
+validación; `401` si no hay token válido.
 
-**Endpoints protegidos** — todo lo que está bajo `/api/v1` **excepto** `/user` y
-`/user/login` requiere una sesión válida. Sin cookie → `401 {"error":"not authenticated"}`.
-Cada petición se filtra por el usuario autenticado: los movimientos, el balance, la
-config de ingreso, los reportes y la analítica sólo devuelven datos de ese usuario.
-Las **categorías son compartidas** entre todos los usuarios.
+**Endpoints protegidos** — todo lo que está bajo `/api/v1` **excepto** `/user`,
+`/user/activate` y `/tokens/authentication` requiere un token válido. Sin token o
+anónimo → `401 {"error":"not authenticated"}`; token malformado/expirado →
+`401 {"error":"invalid or missing authentication token"}`. Cada petición se filtra
+por el usuario autenticado: movimientos, balance, config de ingreso, reportes y
+analítica sólo devuelven datos de ese usuario. Las **categorías son compartidas**.
 
 ### Categorías
 | Método | Ruta                  | Descripción                     |
@@ -415,20 +442,23 @@ curl -s -X POST http://localhost:8080/api/v1/user \
   -d '{"username": "john", "name": "John Doe", "email": "john@example.com", "password": "supersecret"}' | jq .
 ```
 
-Iniciar sesión y guardar la cookie de sesión en `cookies.txt`:
+Obtener un token de autenticación y guardarlo en la variable `TOKEN`:
 
 ```bash
-curl -s -c cookies.txt -X POST http://localhost:8080/api/v1/user/login \
+TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/tokens/authentication \
   -H "Content-Type: application/json" \
-  -d '{"email": "john@example.com", "password": "supersecret"}' | jq .
+  -d '{"email": "john@example.com", "password": "supersecret"}' \
+  | jq -r '.data.authentication_token.token')
 ```
 
-A partir de aquí, las peticiones protegidas usan la cookie con `-b cookies.txt`.
+> El usuario debe estar **activado** (enlace del correo de bienvenida) y el token
+> dura 24 h. A partir de aquí, las peticiones protegidas van con la cabecera
+> `-H "Authorization: Bearer $TOKEN"`.
 
 Crear un gasto:
 
 ```bash
-curl -s -b cookies.txt -X POST http://localhost:8080/api/v1/movements \
+curl -s -H "Authorization: Bearer $TOKEN" -X POST http://localhost:8080/api/v1/movements \
   -H "Content-Type: application/json" \
   -d '{
     "category_id": 1,
@@ -443,7 +473,7 @@ curl -s -b cookies.txt -X POST http://localhost:8080/api/v1/movements \
 Registrar un ingreso:
 
 ```bash
-curl -s -b cookies.txt -X POST http://localhost:8080/api/v1/movements \
+curl -s -H "Authorization: Bearer $TOKEN" -X POST http://localhost:8080/api/v1/movements \
   -H "Content-Type: application/json" \
   -d '{"category_id": 11, "type": "I", "amount": 3000000, "description": "Salario", "date": "2026-07-01"}' | jq .
 ```
@@ -451,7 +481,7 @@ curl -s -b cookies.txt -X POST http://localhost:8080/api/v1/movements \
 Listar movimientos agrupados por categoría (del usuario en sesión):
 
 ```bash
-curl -s -b cookies.txt http://localhost:8080/api/v1/movements | jq .
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/movements | jq .
 ```
 
 Listar gastos con su total (lista plana). Sin filtro trae todos los gastos y su
@@ -459,22 +489,22 @@ total; con filtros, el total de ese subconjunto:
 
 ```bash
 # todos los gastos + total general
-curl -s -b cookies.txt "http://localhost:8080/api/v1/movements/expenses" | jq .
+curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8080/api/v1/movements/expenses" | jq .
 
 # solo una categoría (p. ej. Alimentacion = 2) → total de esa categoría
-curl -s -b cookies.txt "http://localhost:8080/api/v1/movements/expenses?category_id=2" | jq .
+curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8080/api/v1/movements/expenses?category_id=2" | jq .
 
 # por rango de fechas → total del rango
-curl -s -b cookies.txt "http://localhost:8080/api/v1/movements/expenses?date_from=2026-07-01&date_to=2026-07-31" | jq .
+curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8080/api/v1/movements/expenses?date_from=2026-07-01&date_to=2026-07-31" | jq .
 
 # solo el total (sin la lista)
-curl -s -b cookies.txt "http://localhost:8080/api/v1/movements/expenses?category_id=2" | jq '.data.total'
+curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8080/api/v1/movements/expenses?category_id=2" | jq '.data.total'
 ```
 
 Fijar el ingreso mensual:
 
 ```bash
-curl -s -b cookies.txt -X PUT http://localhost:8080/api/v1/incomes/config \
+curl -s -H "Authorization: Bearer $TOKEN" -X PUT http://localhost:8080/api/v1/incomes/config \
   -H "Content-Type: application/json" \
   -d '{"amount": 3000000, "cut_day": 24}' | jq .
 ```

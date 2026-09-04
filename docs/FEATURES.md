@@ -11,20 +11,36 @@ All routes are under the base path `/api/v1`. Responses are wrapped in a standar
 
 ## Authentication & users
 
-Server-side sessions (cookie `session`, stored in MySQL via `alexedwards/scs`).
-Passwords are hashed with bcrypt (cost 12) — never stored in plaintext.
+Token-based authentication (`Authorization: Bearer <token>`). Passwords are hashed
+with bcrypt (cost 12) — never stored in plaintext; only the SHA-256 hash of each
+token is stored, never the plaintext. The legacy cookie-session login
+(`alexedwards/scs`) still exists but is **being deprecated** — protected endpoints
+now validate the token, not the cookie.
 
 | Method | Route | Auth | Description |
 |---|---|---|---|
-| POST | `/user` | Public | Register a user (`username`, `name`, `email`, `password`) |
-| POST | `/user/login` | Public | Log in (`email`, `password`); sets the `session` cookie |
-| POST | `/user/logout` | Session | Destroy the current session (only that device's) |
-| POST | `/change_password` | Session | Change password; re-verifies the current password |
+| POST | `/user` | Public | Register a user; issues an activation token + welcome email |
+| GET | `/user/activate` | Public (token in query) | Activate the account via the emailed link |
+| POST | `/tokens/authentication` | Public | **Login**: verify `email`+`password`, return an `authentication_token` (24 h) |
+| POST | `/tokens/logout` | Bearer | **Logout**: delete all the user's authentication tokens (logs out every device) |
+| POST | `/change_password` | Bearer | Change password; re-verifies the current password |
+| POST | `/user/login` | Public | *(Legacy)* cookie-session login — being deprecated |
+| POST | `/user/logout` | Session | *(Legacy)* destroy the cookie session |
 
-- **Protected endpoints:** everything below requires a valid session. Without a
-  cookie → `401 { "error": "not authenticated" }`.
+- **Flow:** register → activate (emailed token) → `POST /tokens/authentication` to
+  get a token → send `Authorization: Bearer <token>` on protected requests.
+- **Middlewares:** `authenticate` resolves identity (anonymous or the token's user)
+  on every request; `ProtectEndpoint` rejects anonymous users on protected routes.
+  Both `ProtectEndpoint` (token) and the legacy `RestrictEndpoint` (session) feed
+  the same user-id context, so handlers are agnostic to the auth method.
+- **Errors:** bad credentials → `401 invalid email or password` (identical for
+  unknown email and wrong password, to avoid user enumeration); missing/anonymous →
+  `401 not authenticated`; malformed/expired token → `401 invalid or missing
+  authentication token`.
 - **Per-user scoping:** movements, income config, balance, reports and analytics
   only ever return the authenticated user's data. Categories are **shared**.
+- **Note:** account activation does **not** yet gate login (a registered,
+  non-activated user can still obtain a token).
 
 ## Categories
 
@@ -105,9 +121,10 @@ Common analytics filter: `?months=` (size of the trailing window).
 
 ## Cross-cutting capabilities
 
-- **Session auth at the edge:** a middleware validates the session and injects the
-  user id into the request context; handlers read it from there, never from
-  client input. (Designed to swap to JWT later without touching the domain code.)
+- **Auth at the edge:** middlewares validate the bearer token (or, legacy, the
+  session) and inject the user id into the request context; handlers read it from
+  there, never from client input. The identity source is swappable (token/session/
+  JWT) without touching the domain code.
 - **Per-user data isolation:** every financial query is scoped by `user_id`.
 - **Consistent responses:** all handlers use the `Envelope` helpers; errors map to
   proper HTTP status codes (`400`, `401`, `404`, `500`).
