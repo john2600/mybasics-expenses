@@ -45,6 +45,12 @@ func Unauthorized(w http.ResponseWriter, err error) {
 	JSON(w, http.StatusUnauthorized, Envelope{Error: err.Error()})
 }
 
+// NotActivateAccount writes a 403 JSON error response, used when the caller is
+// authenticated but their account has not been activated yet.
+func NotActivateAccount(w http.ResponseWriter, err error) {
+	JSON(w, http.StatusForbidden, Envelope{Error: err.Error()})
+}
+
 // NotFound writes a 404 JSON error response.
 func NotFound(w http.ResponseWriter, msg string) {
 	JSON(w, http.StatusNotFound, Envelope{Error: msg})

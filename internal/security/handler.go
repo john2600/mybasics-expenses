@@ -72,17 +72,28 @@ func UserFromContext(r *http.Request) *data.User {
 	return user
 }
 
-// ProtectEndpoint gates a route on a non-anonymous authenticated user (resolved
-// from a bearer token by the authenticate middleware). Anonymous or missing user
-// is rejected with 401 — the same behaviour as RestrictEndpoint. On success it
-// bridges the user id into userIDKey, so handlers using RequireUserID work
-// unchanged regardless of whether auth came from a session (RestrictEndpoint) or
-// a token (this).
-func (s *Security) ProtectEndpoint(next http.Handler) http.Handler {
+// RequireActivatedUserForThisEndpoint gates a route on an authenticated *and*
+// activated user, resolved from a bearer token by the authenticate middleware.
+// It rejects in two distinct ways, and the difference is deliberate:
+//
+//   - no user in the context, or the anonymous user -> 401 "not authenticated".
+//     The caller never proved who they are (missing, malformed or expired token).
+//   - a real user whose account was never activated -> 403. The token is valid
+//     and the identity is known, the account just is not allowed through yet.
+//
+// On success it bridges the user id into userIDKey, so handlers using
+// RequireUserID work unchanged regardless of whether auth came from a session
+// (RestrictEndpoint) or a token (this).
+func (s *Security) RequireActivatedUserForThisEndpoint(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := UserFromContext(r)
 		if user == nil || user.IsAnonymous() {
 			response.Unauthorized(w, errors.New("not authenticated"))
+			return
+		}
+
+		if !user.Activated {
+			response.NotActivateAccount(w, errors.New("user not is not active"))
 			return
 		}
 

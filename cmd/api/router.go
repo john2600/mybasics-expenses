@@ -13,7 +13,7 @@ import (
 
 // NewRouter builds the HTTP handler from the wired application: global
 // middlewares, the public health check, and the /api/v1 tree (public user routes
-// + the session-protected group). Serving is the caller's responsibility (main).
+// + the token-protected group). Serving is the caller's responsibility (main).
 func NewRouter(app *Application) http.Handler {
 	r := chi.NewRouter()
 
@@ -36,13 +36,15 @@ func NewRouter(app *Application) http.Handler {
 		// Protected group. Both guards feed the same userIDKey, so handlers
 		// (RequireUserID) don't care which one ran:
 		//   - RestrictEndpoint (legacy) sources the id from the session cookie.
-		//   - ProtectEndpoint  (new)    sources it from the bearer token via the
-		//     global authenticate middleware.
+		//   - RequireActivatedUserForThisEndpoint (new) sources it from the
+		//     bearer token via the global authenticate middleware, and also
+		//     requires the account to be activated (401 when the caller is
+		//     unidentified, 403 when they are identified but not activated).
 		r.Group(func(r chi.Router) {
 
 			// Legacy session guard — kept for reference while migrating.
 			// r.Use(app.Security.Handlers.RestrictEndpoint)
-			r.Use(app.Security.Handlers.ProtectEndpoint)
+			r.Use(app.Security.Handlers.RequireActivatedUserForThisEndpoint)
 			app.Security.Auth.RegisterProtectedRoutes(r)
 			app.Users.Handlers.RegisterProtectedRoutes(r)
 			app.Movements.Handlers.RegisterRoutes(r)
