@@ -93,7 +93,7 @@ func (s *Security) RequireActivatedUserForThisEndpoint(next http.Handler) http.H
 		}
 
 		if !user.Activated {
-			response.NotActivateAccount(w, errors.New("user not is not active"))
+			response.NotActivateAccount(w, errors.New("account not activated"))
 			return
 		}
 

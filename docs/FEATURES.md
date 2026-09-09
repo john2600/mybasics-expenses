@@ -37,7 +37,7 @@ now validate the token, not the cookie.
 - **Errors:** bad credentials → `401 invalid email or password` (identical for
   unknown email and wrong password, to avoid user enumeration); missing/anonymous →
   `401 not authenticated`; malformed/expired token → `401 invalid or missing
-  authentication token`; valid token on a non-activated account → `403`. The two
+  authentication token`; valid token on a non-activated account → `403 account not activated`. The two
   classes are distinct on purpose: `401` = identity not proven, `403` = identity
   known but not allowed through.
 - **Per-user scoping:** movements, income config, balance, reports and analytics

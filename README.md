@@ -367,7 +367,7 @@ match or validation fails; `401` if there is no valid token.
 activated account**. No token or an anonymous user → `401 {"error":"not
 authenticated"}`; a malformed/expired token → `401 {"error":"invalid or missing
 authentication token"}`; a valid token whose account was never activated →
-`403`. The distinction is deliberate: `401` means the caller never proved who
+`403 {"error":"account not activated"}`. The distinction is deliberate: `401` means the caller never proved who
 they are, `403` means the identity is known but the account is not allowed
 through yet. Every request is filtered by the authenticated user: movements,
 balance, income config, reports and analytics only return that user's data.

@@ -106,8 +106,8 @@ func TestRequireActivatedUser_NotActivatedRejected(t *testing.T) {
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("status = %d, want 403", rec.Code)
 	}
-	if body := strings.TrimSpace(rec.Body.String()); body != `{"error":"user not is not active"}` {
-		t.Errorf("body = %q, want %q", body, `{"error":"user not is not active"}`)
+	if body := strings.TrimSpace(rec.Body.String()); body != `{"error":"account not activated"}` {
+		t.Errorf("body = %q, want %q", body, `{"error":"account not activated"}`)
 	}
 }
 
