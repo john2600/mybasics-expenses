@@ -1,11 +1,11 @@
-# MyBasics-Expenses — API de Finanzas Personales
+# MyBasics-Expenses — Personal Finance API
 
-API en Go para llevar el control de tus finanzas personales. **Tú registras cada
-movimiento manualmente** (ingreso o gasto); la API los agrupa por categoría y los
-convierte en balances, reportes y analíticas.
+A Go API for keeping track of your personal finances. **You record every movement
+manually** (income or expense); the API groups them by category and turns them
+into balances, reports and analytics.
 
-> Este proyecto es una versión simplificada de MyExpenses: **no incluye ingesta
-> automática de correos**. Todos los movimientos los crea el usuario vía API.
+> This project is a simplified version of MyExpenses: it **does not include
+> automatic email ingestion**. Every movement is created by the user via the API.
 
 ---
 
@@ -32,26 +32,26 @@ Overview of what the API does (full catalog in
 
 - **Go 1.25** · router [chi](https://github.com/go-chi/chi) · `database/sql` + `go-sql-driver/mysql`
 - **MySQL 8.0** (Docker)
-- Patrón por capas **Repository → Service → Handler**
-- Módulo Go: `github.com/jscodelab/mybasics-expenses`
+- **Repository → Service → Handler** layered pattern
+- Go module: `github.com/jscodelab/mybasics-expenses`
 
 ---
 
-## Estructura
+## Structure
 
 ```
 mybasics-expenses/
-├── cmd/api/main.go            # Punto de entrada y wiring
+├── cmd/api/main.go            # Entry point and wiring
 ├── internal/
-│   ├── category/              # Categorías        (model, repository, service, handler)
-│   ├── movement/              # Movimientos I/E   (model, repository, service, handler)
-│   ├── incomes/              # Config de ingreso fijo (versionado)
-│   ├── balance/              # Balance disponible y periodos de corte
-│   ├── reports/              # Exportación de datos
-│   ├── analytics/            # Agregaciones y tendencias
-│   └── platform/database/    # Factory de conexión MySQL
-├── pkg/response/             # Helpers de respuesta (Envelope)
-├── migrations/                # Migraciones golang-migrate (000001_init..., 000002_...)
+│   ├── category/              # Categories       (model, repository, service, handler)
+│   ├── movement/              # Movements I/E    (model, repository, service, handler)
+│   ├── incomes/              # Fixed income config (versioned)
+│   ├── balance/              # Available balance and billing periods
+│   ├── reports/              # Data export
+│   ├── analytics/            # Aggregations and trends
+│   └── platform/database/    # MySQL connection factory
+├── pkg/response/             # Response helpers (Envelope)
+├── migrations/                # golang-migrate migrations (000001_init..., 000002_...)
 ├── docker-compose.yml
 └── Dockerfile
 ```
@@ -229,29 +229,29 @@ stay reproducible.
 
 ---
 
-## Puesta en marcha
+## Getting started
 
-### Opción A — Local
+### Option A — Local
 
 ```bash
-cp .env.example .env          # ajusta credenciales de tu MySQL
-docker compose up db          # levanta solo la base de datos
-go run ./cmd/api/...          # levanta el API
+cp .env.example .env          # adjust your MySQL credentials
+docker compose up db          # start the database only
+go run ./cmd/api/...          # start the API
 ```
 
-El API queda en **http://localhost:8080**.
+The API listens on **http://localhost:8080**.
 
-### Opción B — Docker Compose (MySQL + API)
+### Option B — Docker Compose (MySQL + API)
 
 ```bash
 docker compose up --build
 ```
 
-Aquí el API queda en **http://localhost:8081** y la base en el puerto `3308`.
+Here the API listens on **http://localhost:8081** and the database on port `3308`.
 
-El esquema lo gestiona **golang-migrate** (ya no se auto-ejecuta un init). Tras
-levantar la base, aplica las migraciones con la imagen oficial `migrate/migrate`
-(sin borrar datos — nunca toca el volumen):
+The schema is managed by **golang-migrate** (an init script is no longer
+auto-executed). Once the database is up, apply the migrations with the official
+`migrate/migrate` image (data-safe — it never touches the volume):
 
 ```bash
 NET=mybasics-expenses_mybasics_expenses_net
@@ -260,21 +260,21 @@ docker run --rm --network "$NET" -v "$(pwd)/migrations:/migrations" migrate/migr
   -path=/migrations -database "$DSN" up
 ```
 
-Esto crea las tablas y siembra las categorías base. En una base que ya tenía el
-esquema antes de golang-migrate, haz `... force 1` una vez antes de `up`.
+This creates the tables and seeds the base categories. On a database that already
+had the schema before golang-migrate existed, run `... force 1` once before `up`.
 
 ---
 
-## Variables de entorno
+## Environment variables
 
-| Variable      | Default   | Descripción            |
-|---------------|-----------|------------------------|
-| `PORT`        | `8080`              | Puerto del API         |
-| `DB_HOST`     | `localhost`         | Host de MySQL          |
-| `DB_PORT`     | `3306`              | Puerto de MySQL        |
-| `DB_USER`     | `root`              | Usuario de MySQL       |
-| `DB_PASSWORD` | *(vacío)*           | Contraseña de MySQL    |
-| `DB_NAME`     | `mybasics_expenses` | Nombre de la base      |
+| Variable      | Default             | Description            |
+|---------------|---------------------|------------------------|
+| `PORT`        | `8080`              | API port               |
+| `DB_HOST`     | `localhost`         | MySQL host             |
+| `DB_PORT`     | `3306`              | MySQL port             |
+| `DB_USER`     | `root`              | MySQL user             |
+| `DB_PASSWORD` | *(empty)*           | MySQL password         |
+| `DB_NAME`     | `mybasics_expenses` | Database name          |
 
 ---
 
@@ -301,100 +301,100 @@ does not. Verify the connection with `claude mcp list`.
 
 Base URL: `http://localhost:8080/api/v1`
 
-### Autenticación
+### Authentication
 
-La API usa **autenticación por token** (Bearer). El flujo es: registrar un
-usuario, **activar** la cuenta con el enlace del correo de bienvenida, **obtener
-un token** con email + password, y enviar ese token en la cabecera
-`Authorization: Bearer <token>` en cada petición a un endpoint protegido.
+The API uses **token-based authentication** (Bearer). The flow is: register a
+user, **activate** the account with the link from the welcome email, **get a
+token** with email + password, and send that token in the
+`Authorization: Bearer <token>` header on every request to a protected endpoint.
 
-> El login por **cookie de sesión** (`/user/login`, `alexedwards/scs`) sigue
-> existiendo pero está **en proceso de deprecación**: los endpoints protegidos ya
-> validan el **token**, no la cookie.
+> The **session cookie** login (`/user/login`, `alexedwards/scs`) still exists but
+> is **being deprecated**: protected endpoints already validate the **token**, not
+> the cookie.
 
-| Método | Ruta | Auth | Descripción |
-|--------|------|------|-------------|
-| POST | `/user` | Pública | Registra un usuario. Emite un token de activación y envía el correo de bienvenida |
-| GET  | `/user/activate` | Pública (token en query) | Activa la cuenta con el token del enlace del correo |
-| POST | `/tokens/authentication` | Pública | **Login nuevo**: verifica email+password y devuelve un `authentication_token` |
-| POST | `/tokens/logout` | Protegida | **Logout nuevo**: borra los tokens de autenticación del usuario (cierra sesión en todos los dispositivos) |
-| POST | `/change_password` | Protegida | Cambia la contraseña (re-verifica la actual) |
-| POST | `/user/login` | Pública | *(Legacy)* login por cookie de sesión — en deprecación |
-| POST | `/user/logout` | Protegida | *(Legacy)* cierra la sesión de cookie |
+| Method | Route | Auth | Description |
+|--------|-------|------|-------------|
+| POST | `/user` | Public | Registers a user. Issues an activation token and sends the welcome email |
+| GET  | `/user/activate` | Public (token in query) | Activates the account with the token from the email link |
+| POST | `/tokens/authentication` | Public | **New login**: verifies email+password and returns an `authentication_token` |
+| POST | `/tokens/logout` | Protected | **New logout**: deletes the user's authentication tokens (signs out on every device) |
+| POST | `/change_password` | Protected | Changes the password (re-verifies the current one) |
+| POST | `/user/login` | Public | *(Legacy)* session cookie login — being deprecated |
+| POST | `/user/logout` | Protected | *(Legacy)* ends the cookie session |
 
-**Registro** — body `{ "username", "name", "email", "password" }`.
-`password` entre 8 y 72 caracteres; `username` y `email` únicos.
-Respuesta `201` `{ "data": "user created" }`. Al registrar se genera un **token de
-activación** (válido 3 días) y se envía por correo. `username`/`email` duplicados →
+**Registration** — body `{ "username", "name", "email", "password" }`.
+`password` between 8 and 72 characters; `username` and `email` unique.
+Response `201` `{ "data": "user created" }`. Registering generates an **activation
+token** (valid for 3 days) which is sent by email. A duplicate `username`/`email` →
 `400 { "error": "username or email already in use" }`.
 
-**Activación** — `GET /user/activate?token=<token>` (el enlace llega en el correo
-de bienvenida). Éxito → `200 { "data": "account activated" }`; token inválido o
-expirado → `400 { "error": "invalid or expired activation link" }`.
+**Activation** — `GET /user/activate?token=<token>` (the link arrives in the
+welcome email). Success → `200 { "data": "account activated" }`; an invalid or
+expired token → `400 { "error": "invalid or expired activation link" }`.
 
 **Login (token)** — `POST /tokens/authentication`, body `{ "email", "password" }`.
-Éxito → `201`:
+Success → `201`:
 ```json
 { "data": { "authentication_token": { "token": "…", "expiry": "2026-01-02T03:04:05Z" } } }
 ```
-El token dura **24 h**. Credenciales inválidas (email inexistente **o** password
-incorrecto → mismo error, para no revelar qué cuentas existen) →
-`401 { "error": "invalid email or password" }`. Validación (campos vacíos, password
-corto) → `400`.
+The token lasts **24 h**. Invalid credentials (a non-existent email **or** a wrong
+password return the same error, so as not to reveal which accounts exist) →
+`401 { "error": "invalid email or password" }`. Validation errors (empty fields, a
+short password) → `400`.
 
-**Usar el token** — enviar en cada petición protegida:
-`Authorization: Bearer <token>`. El middlware `authenticate` resuelve el usuario;
-`ProtectEndpoint` exige que **no** sea anónimo.
+**Using the token** — send it on every protected request:
+`Authorization: Bearer <token>`. The `authenticate` middleware resolves the user;
+`ProtectEndpoint` requires that the user is **not** anonymous.
 
-**Logout (token)** — `POST /tokens/logout` con `Authorization: Bearer <token>`.
-Borra **todos** los tokens de autenticación del usuario (no solo el actual), por lo
-que cierra la sesión en todos los dispositivos. Éxito → `200 { "data": "logged out" }`.
-No hay estado que invalidar del lado del cliente más allá de descartar el token.
+**Logout (token)** — `POST /tokens/logout` with `Authorization: Bearer <token>`.
+It deletes **all** of the user's authentication tokens (not just the current one),
+so it signs the user out on every device. Success → `200 { "data": "logged out" }`.
+There is no client-side state to invalidate beyond discarding the token.
 
-**Cambio de contraseña** — protegida, y re-verifica la contraseña actual en el body:
+**Password change** — protected, and it re-verifies the current password in the body:
 ```json
 {
   "login_request": { "email": "john@example.com", "password": "currentPass123" },
   "new_password": "brandNewPass456"
 }
 ```
-Reglas: `new_password` entre 8 y 72 caracteres y **distinta** de la actual.
-`200 { "data": "password updated" }` en éxito; `400` si no coincide o falla la
-validación; `401` si no hay token válido.
+Rules: `new_password` between 8 and 72 characters and **different** from the
+current one. `200 { "data": "password updated" }` on success; `400` if it does not
+match or validation fails; `401` if there is no valid token.
 
-**Endpoints protegidos** — todo lo que está bajo `/api/v1` **excepto** `/user`,
-`/user/activate` y `/tokens/authentication` requiere un token válido. Sin token o
-anónimo → `401 {"error":"not authenticated"}`; token malformado/expirado →
-`401 {"error":"invalid or missing authentication token"}`. Cada petición se filtra
-por el usuario autenticado: movimientos, balance, config de ingreso, reportes y
-analítica sólo devuelven datos de ese usuario. Las **categorías son compartidas**.
+**Protected endpoints** — everything under `/api/v1` **except** `/user`,
+`/user/activate` and `/tokens/authentication` requires a valid token. No token or
+an anonymous user → `401 {"error":"not authenticated"}`; a malformed/expired token →
+`401 {"error":"invalid or missing authentication token"}`. Every request is
+filtered by the authenticated user: movements, balance, income config, reports and
+analytics only return that user's data. **Categories are shared**.
 
-### Categorías
-| Método | Ruta                  | Descripción                     |
+### Categories
+| Method | Route                 | Description                     |
 |--------|-----------------------|---------------------------------|
-| GET    | `/categories`         | Lista categorías                |
-| POST   | `/categories`         | Crea una categoría              |
-| GET    | `/categories/{id}`    | Obtiene una categoría           |
-| PUT    | `/categories/{id}`    | Edita una categoría             |
-| DELETE | `/categories/{id}`    | Elimina una categoría           |
+| GET    | `/categories`         | Lists categories                |
+| POST   | `/categories`         | Creates a category              |
+| GET    | `/categories/{id}`    | Gets a category                 |
+| PUT    | `/categories/{id}`    | Updates a category              |
+| DELETE | `/categories/{id}`    | Deletes a category              |
 
-### Movimientos
-| Método | Ruta                     | Descripción                                      |
+### Movements
+| Method | Route                    | Description                                      |
 |--------|--------------------------|--------------------------------------------------|
-| POST   | `/movements`             | Crea un movimiento (`type` `I`=ingreso, `E`=gasto) |
-| GET    | `/movements`             | Lista movimientos agrupados por categoría         |
-| GET    | `/movements/expenses`    | Lista plana de gastos **+ total** del filtro (`?category_id=&date_from=&date_to=&limit=`) |
-| GET    | `/movements/summary`     | Totales de gasto por mes                          |
-| GET    | `/movements/{id}`        | Obtiene un movimiento                             |
-| PUT    | `/movements/{id}`        | Edita un movimiento                              |
-| DELETE | `/movements/{id}`        | Elimina un movimiento                            |
+| POST   | `/movements`             | Creates a movement (`type` `I`=income, `E`=expense) |
+| GET    | `/movements`             | Lists movements grouped by category               |
+| GET    | `/movements/expenses`    | Flat list of expenses **+ total** for the filter (`?category_id=&date_from=&date_to=&limit=`) |
+| GET    | `/movements/summary`     | Expense totals per month                          |
+| GET    | `/movements/{id}`        | Gets a movement                                   |
+| PUT    | `/movements/{id}`        | Updates a movement                               |
+| DELETE | `/movements/{id}`        | Deletes a movement                               |
 
-Filtros de `GET /movements`: `category_id`, `type`, `date_from`, `date_to`, `limit`.
+Filters for `GET /movements`: `category_id`, `type`, `date_from`, `date_to`, `limit`.
 
-**`GET /movements/expenses`** devuelve la lista plana de gastos (`type=E`) más el
-`total` de los gastos que cumplen el filtro. Sin filtro, es el total de todos los
-gastos; con `category_id` / rango de fechas, el total de ese subconjunto. La
-respuesta es un objeto `{ total, movements }`:
+**`GET /movements/expenses`** returns the flat list of expenses (`type=E`) plus the
+`total` of the expenses matching the filter. With no filter it is the total of all
+expenses; with `category_id` / a date range, the total of that subset. The response
+is an object `{ total, movements }`:
 ```json
 {
   "data": {
@@ -407,34 +407,34 @@ respuesta es un objeto `{ total, movements }`:
   }
 }
 ```
-> Filtros aceptados: `category_id`, `date_from`, `date_to`, `limit` (el `type`
-> siempre es `E`). Con `limit` (paginación) el `total` refleja los gastos
-> devueltos en esa página.
+> Accepted filters: `category_id`, `date_from`, `date_to`, `limit` (`type` is
+> always `E`). With `limit` (pagination) the `total` reflects the expenses
+> returned on that page.
 
-> Todos los endpoints de Movimientos, Ingreso fijo, Balance, Reportes y Analítica
-> están **protegidos**: requieren la cookie de sesión y están acotados al usuario
-> autenticado. El `user_id` **no** se envía en el body ni en la query — se toma de
-> la sesión.
+> Every Movements, Fixed income, Balance, Reports and Analytics endpoint is
+> **protected**: they require the session cookie and are scoped to the
+> authenticated user. The `user_id` is **not** sent in the body or the query — it
+> is taken from the session.
 
-### Ingreso fijo, balance, reportes y analítica
-| Método | Ruta                             | Descripción                            |
+### Fixed income, balance, reports and analytics
+| Method | Route                            | Description                            |
 |--------|----------------------------------|----------------------------------------|
-| GET    | `/incomes/config`                | Config de ingreso fijo vigente         |
-| PUT    | `/incomes/config`                | Crea/actualiza el ingreso fijo         |
-| GET    | `/balance`                       | Balance disponible                     |
-| GET    | `/balance/periods`               | Balance por periodo de corte           |
-| GET    | `/reports/export`                | Exporta los datos                      |
-| GET    | `/analytics/summary`             | Resumen general                        |
-| GET    | `/analytics/by-category`         | Gasto por categoría                    |
-| GET    | `/analytics/trend`               | Tendencia temporal                     |
-| GET    | `/analytics/top-expenses`        | Mayores gastos                         |
-| GET    | `/analytics/income-vs-expense`   | Ingreso vs gasto                       |
+| GET    | `/incomes/config`                | Current fixed income config            |
+| PUT    | `/incomes/config`                | Creates/updates the fixed income       |
+| GET    | `/balance`                       | Available balance                      |
+| GET    | `/balance/periods`               | Balance per billing period             |
+| GET    | `/reports/export`                | Exports the data                       |
+| GET    | `/analytics/summary`             | General summary                        |
+| GET    | `/analytics/by-category`         | Spending per category                  |
+| GET    | `/analytics/trend`               | Trend over time                        |
+| GET    | `/analytics/top-expenses`        | Largest expenses                       |
+| GET    | `/analytics/income-vs-expense`   | Income vs expense                      |
 
 ---
 
-## Ejemplos con curl
+## curl examples
 
-Registrar un usuario:
+Register a user:
 
 ```bash
 curl -s -X POST http://localhost:8080/api/v1/user \
@@ -442,7 +442,7 @@ curl -s -X POST http://localhost:8080/api/v1/user \
   -d '{"username": "john", "name": "John Doe", "email": "john@example.com", "password": "supersecret"}' | jq .
 ```
 
-Obtener un token de autenticación y guardarlo en la variable `TOKEN`:
+Get an authentication token and store it in the `TOKEN` variable:
 
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/tokens/authentication \
@@ -451,11 +451,11 @@ TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/tokens/authentication \
   | jq -r '.data.authentication_token.token')
 ```
 
-> El usuario debe estar **activado** (enlace del correo de bienvenida) y el token
-> dura 24 h. A partir de aquí, las peticiones protegidas van con la cabecera
-> `-H "Authorization: Bearer $TOKEN"`.
+> The user must be **activated** (link from the welcome email) and the token lasts
+> 24 h. From here on, protected requests carry the
+> `-H "Authorization: Bearer $TOKEN"` header.
 
-Crear un gasto:
+Create an expense:
 
 ```bash
 curl -s -H "Authorization: Bearer $TOKEN" -X POST http://localhost:8080/api/v1/movements \
@@ -464,44 +464,44 @@ curl -s -H "Authorization: Bearer $TOKEN" -X POST http://localhost:8080/api/v1/m
     "category_id": 1,
     "type": "E",
     "amount": 42500,
-    "description": "Mercado de la semana",
+    "description": "Weekly groceries",
     "date": "2026-07-15",
     "hour": "10:30"
   }' | jq .
 ```
 
-Registrar un ingreso:
+Record an income:
 
 ```bash
 curl -s -H "Authorization: Bearer $TOKEN" -X POST http://localhost:8080/api/v1/movements \
   -H "Content-Type: application/json" \
-  -d '{"category_id": 11, "type": "I", "amount": 3000000, "description": "Salario", "date": "2026-07-01"}' | jq .
+  -d '{"category_id": 11, "type": "I", "amount": 3000000, "description": "Salary", "date": "2026-07-01"}' | jq .
 ```
 
-Listar movimientos agrupados por categoría (del usuario en sesión):
+List movements grouped by category (for the logged-in user):
 
 ```bash
 curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/movements | jq .
 ```
 
-Listar gastos con su total (lista plana). Sin filtro trae todos los gastos y su
-total; con filtros, el total de ese subconjunto:
+List expenses with their total (flat list). With no filter it returns every
+expense and the overall total; with filters, the total of that subset:
 
 ```bash
-# todos los gastos + total general
+# every expense + overall total
 curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8080/api/v1/movements/expenses" | jq .
 
-# solo una categoría (p. ej. Alimentacion = 2) → total de esa categoría
+# a single category (e.g. Alimentacion = 2) → total for that category
 curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8080/api/v1/movements/expenses?category_id=2" | jq .
 
-# por rango de fechas → total del rango
+# by date range → total for the range
 curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8080/api/v1/movements/expenses?date_from=2026-07-01&date_to=2026-07-31" | jq .
 
-# solo el total (sin la lista)
+# only the total (without the list)
 curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8080/api/v1/movements/expenses?category_id=2" | jq '.data.total'
 ```
 
-Fijar el ingreso mensual:
+Set the monthly income:
 
 ```bash
 curl -s -H "Authorization: Bearer $TOKEN" -X PUT http://localhost:8080/api/v1/incomes/config \
@@ -511,9 +511,9 @@ curl -s -H "Authorization: Bearer $TOKEN" -X PUT http://localhost:8080/api/v1/in
 
 ---
 
-## Formato de respuesta
+## Response format
 
-Todas las respuestas se envuelven en un `Envelope`:
+Every response is wrapped in an `Envelope`:
 
 ```json
 {
@@ -523,8 +523,8 @@ Todas las respuestas se envuelven en un `Envelope`:
 }
 ```
 
-Los handlers **siempre** usan los helpers de `pkg/response` (`Success`, `Created`,
-`NotFound`, …) — nunca escriben JSON crudo.
+Handlers **always** use the `pkg/response` helpers (`Success`, `Created`,
+`NotFound`, …) — they never write raw JSON.
 
 ---
 
@@ -534,14 +534,14 @@ Los handlers **siempre** usan los helpers de `pkg/response` (`Success`, `Created
 curl -i http://localhost:8080/health
 ```
 
-Responde `200 {"status":"ok"}` si la base responde, o `503 {"status":"degraded"}`.
+Answers `200 {"status":"ok"}` if the database responds, or `503 {"status":"degraded"}`.
 
 ---
 
-## Cómo agregar un módulo nuevo
+## How to add a new module
 
-1. Crear `internal/<nombre>/` con `model.go`, `repository.go`, `service.go`, `handler.go`
-   siguiendo el patrón de `movement/`.
-2. Definir interfaces en cada capa (permite mocks en tests).
-3. Registrar rutas con `RegisterRoutes(r)` y hacer el wiring en `cmd/api/main.go`.
-4. Agregar tests de servicio con un mock inline del repositorio.
+1. Create `internal/<name>/` with `model.go`, `repository.go`, `service.go`, `handler.go`
+   following the `movement/` pattern.
+2. Define interfaces in every layer (enables mocks in tests).
+3. Register the routes with `RegisterRoutes(r)` and do the wiring in `cmd/api/main.go`.
+4. Add service tests with an inline repository mock.
