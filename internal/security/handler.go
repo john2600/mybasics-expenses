@@ -57,9 +57,9 @@ const userKey contextKey = "user"
 
 // ContextSetUser returns a copy of the request carrying the given user in its
 // context. It lives here (and is exported) because both sides need it: the
-// authenticate middleware in package main writes the user, and ProtectEndpoint in
-// this package reads it. main can import security, but not the other way around,
-// so the shared key must live here.
+// authenticate middleware in package main writes the user, and the guards in this
+// package read it. main can import security, but not the other way around, so the
+// shared key must live here.
 func ContextSetUser(r *http.Request, user *data.User) *http.Request {
 	ctx := context.WithValue(r.Context(), userKey, user)
 	return r.WithContext(ctx)
@@ -72,19 +72,20 @@ func UserFromContext(r *http.Request) *data.User {
 	return user
 }
 
-// RequireActivatedUserForThisEndpoint gates a route on an authenticated *and*
-// activated user, resolved from a bearer token by the authenticate middleware.
-// It rejects in two distinct ways, and the difference is deliberate:
+// RequireAuthentication gates a route on a non-anonymous authenticated user,
+// resolved from a bearer token by the authenticate middleware. A missing or
+// anonymous user is rejected with 401 "not authenticated": the caller never
+// proved who they are (no token, or a malformed/expired one).
 //
-//   - no user in the context, or the anonymous user -> 401 "not authenticated".
-//     The caller never proved who they are (missing, malformed or expired token).
-//   - a real user whose account was never activated -> 403. The token is valid
-//     and the identity is known, the account just is not allowed through yet.
+// It deliberately says nothing about activation, so it fits the endpoints that
+// must keep working before the account is activated — logging out and changing
+// the password. Anything that exposes the user's data should use
+// RequireActivatedUserForThisEndpoint instead.
 //
 // On success it bridges the user id into userIDKey, so handlers using
 // RequireUserID work unchanged regardless of whether auth came from a session
 // (RestrictEndpoint) or a token (this).
-func (s *Security) RequireActivatedUserForThisEndpoint(next http.Handler) http.Handler {
+func (s *Security) RequireAuthentication(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := UserFromContext(r)
 		if user == nil || user.IsAnonymous() {
@@ -92,14 +93,34 @@ func (s *Security) RequireActivatedUserForThisEndpoint(next http.Handler) http.H
 			return
 		}
 
-		if !user.Activated {
+		ctx := context.WithValue(r.Context(), userIDKey, user.ID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// RequireActivatedUserForThisEndpoint is RequireAuthentication plus an activation
+// check, which keeps the two rejections distinct:
+//
+//   - no user in the context, or the anonymous user -> 401, from the wrapped
+//     RequireAuthentication. The caller never proved who they are.
+//   - a real user whose account was never activated -> 403 "account not
+//     activated". The token is valid and the identity is known, the account just
+//     is not allowed through yet.
+//
+// Because RequireAuthentication runs first, the user reaching the activation
+// check is guaranteed non-nil and non-anonymous, and its id is already in the
+// context — this only decides whether to continue.
+func (s *Security) RequireActivatedUserForThisEndpoint(next http.Handler) http.Handler {
+	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if user := UserFromContext(r); !user.Activated {
 			response.NotActivateAccount(w, errors.New("account not activated"))
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), userIDKey, user.ID)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		next.ServeHTTP(w, r)
 	})
+
+	return s.RequireAuthentication(fn)
 }
 
 func UserID(ctx context.Context) (int, bool) {

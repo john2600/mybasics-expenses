@@ -29,8 +29,9 @@ func (h *AuthHandler) RegisterRoutes(r chi.Router) {
 	r.Post("/tokens/authentication", h.createAuthenticationToken)
 }
 
-// RegisterProtectedRoutes registers auth routes that require a valid token.
-// Mount this inside the ProtectEndpoint group.
+// RegisterProtectedRoutes registers auth routes that require a valid token but
+// not an activated account — logging out must work for a user who never followed
+// the activation link. Mount this inside the RequireAuthentication group.
 func (h *AuthHandler) RegisterProtectedRoutes(r chi.Router) {
 	r.Post("/tokens/logout", h.logout)
 }
@@ -38,7 +39,7 @@ func (h *AuthHandler) RegisterProtectedRoutes(r chi.Router) {
 // logout is the token-world logout: it deletes all of the current user's
 // authentication tokens, so every issued token stops working (logs the user out
 // of all devices). The user is identified from the context (populated by
-// ProtectEndpoint), never from the request body.
+// RequireAuthentication), never from the request body.
 // POST /api/v1/tokens/logout
 func (h *AuthHandler) logout(w http.ResponseWriter, r *http.Request) {
 	userID, ok := RequireUserID(w, r)

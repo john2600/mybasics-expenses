@@ -24,16 +24,22 @@ now validate the token, not the cookie.
 | POST | `/tokens/authentication` | Public | **Login**: verify `email`+`password`, return an `authentication_token` (24 h) |
 | POST | `/tokens/logout` | Bearer | **Logout**: delete all the user's authentication tokens (logs out every device) |
 | POST | `/change_password` | Bearer | Change password; re-verifies the current password |
+| — | *(all financial routes)* | Bearer + activated | Movements, balance, incomes, reports, analytics, categories |
 | POST | `/user/login` | Public | *(Legacy)* cookie-session login — being deprecated |
 | POST | `/user/logout` | Session | *(Legacy)* destroy the cookie session |
 
 - **Flow:** register → activate (emailed token) → `POST /tokens/authentication` to
   get a token → send `Authorization: Bearer <token>` on protected requests.
 - **Middlewares:** `authenticate` resolves identity (anonymous or the token's user)
-  on every request; `RequireActivatedUserForThisEndpoint` then rejects anonymous
-  users *and* non-activated accounts on protected routes. Both it (token) and the
-  legacy `RestrictEndpoint` (session) feed the same user-id context, so handlers
-  are agnostic to the auth method.
+  on every request, then one of two guards runs depending on the route:
+  `RequireAuthentication` rejects anonymous callers, and
+  `RequireActivatedUserForThisEndpoint` composes it with an activation check.
+  Both, and the legacy `RestrictEndpoint` (session), feed the same user-id
+  context, so handlers are agnostic to the auth method.
+- **Two protection tiers:** `/tokens/logout`, `/change_password` and
+  `/user/logout` need only a valid token — a user who registered but never
+  activated still has to be able to log out and change their password. Every
+  route that touches financial data additionally requires an activated account.
 - **Errors:** bad credentials → `401 invalid email or password` (identical for
   unknown email and wrong password, to avoid user enumeration); missing/anonymous →
   `401 not authenticated`; malformed/expired token → `401 invalid or missing
@@ -42,10 +48,10 @@ now validate the token, not the cookie.
   known but not allowed through.
 - **Per-user scoping:** movements, income config, balance, reports and analytics
   only ever return the authenticated user's data. Categories are **shared**.
-- **Note:** account activation gates **protected endpoints**, not token issuance:
-  a registered, non-activated user can still call `/tokens/authentication` and get
-  a token, but every protected route then answers `403` until they follow the
-  activation link.
+- **Note:** account activation gates the **financial routes**, not token issuance:
+  a registered, non-activated user can still call `/tokens/authentication`, get a
+  token, log out and change their password, but every financial route answers
+  `403` until they follow the activation link.
 
 ## Categories
 

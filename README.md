@@ -343,8 +343,10 @@ password return the same error, so as not to reveal which accounts exist) →
 short password) → `400`.
 
 **Using the token** — send it on every protected request:
-`Authorization: Bearer <token>`. The `authenticate` middleware resolves the user;
-`ProtectEndpoint` requires that the user is **not** anonymous.
+`Authorization: Bearer <token>`. The `authenticate` middleware resolves the user,
+then one of two guards runs depending on the route: `RequireAuthentication`
+(the user must not be anonymous) or `RequireActivatedUserForThisEndpoint` (that,
+plus an activated account).
 
 **Logout (token)** — `POST /tokens/logout` with `Authorization: Bearer <token>`.
 It deletes **all** of the user's authentication tokens (not just the current one),
@@ -363,15 +365,30 @@ current one. `200 { "data": "password updated" }` on success; `400` if it does n
 match or validation fails; `401` if there is no valid token.
 
 **Protected endpoints** — everything under `/api/v1` **except** `/user`,
-`/user/activate` and `/tokens/authentication` requires a valid token **from an
-activated account**. No token or an anonymous user → `401 {"error":"not
-authenticated"}`; a malformed/expired token → `401 {"error":"invalid or missing
-authentication token"}`; a valid token whose account was never activated →
-`403 {"error":"account not activated"}`. The distinction is deliberate: `401` means the caller never proved who
-they are, `403` means the identity is known but the account is not allowed
-through yet. Every request is filtered by the authenticated user: movements,
-balance, income config, reports and analytics only return that user's data.
-**Categories are shared**.
+`/user/activate` and `/tokens/authentication` requires a valid token. They split
+into two tiers:
+
+| Tier | Routes | Requires |
+|---|---|---|
+| Authenticated | `/tokens/logout`, `/change_password`, `/user/logout` | a valid token |
+| Authenticated + activated | movements, balance, incomes, reports, analytics, categories | a valid token **and** an activated account |
+
+Account management sits in the first tier on purpose: a user who registered but
+never followed the activation link still holds a valid token, and locking them
+out of logout and change-password would strand them. Everything that touches
+their financial data sits in the second.
+
+In both tiers, no token or an anonymous user → `401 {"error":"not
+authenticated"}`, and a malformed or expired token →
+`401 {"error":"invalid or missing authentication token"}`. In the second tier
+only, a valid token whose account was never activated →
+`403 {"error":"account not activated"}`. The distinction is deliberate: `401`
+means the caller never proved who they are, `403` means the identity is known
+but the account is not allowed through yet.
+
+Every request is filtered by the authenticated user: movements, balance, income
+config, reports and analytics only return that user's data. **Categories are
+shared**.
 
 ### Categories
 | Method | Route                 | Description                     |

@@ -21,25 +21,43 @@ func nextProbe(called *bool, gotID *int, gotOK *bool) http.Handler {
 	})
 }
 
-// serveGuard runs RequireActivatedUserForThisEndpoint over a request whose
-// context carries the given user, mirroring what the authenticate middleware
-// does in production. A nil user means authenticate never stored one.
-func serveGuard(t *testing.T, user *data.User) (*httptest.ResponseRecorder, bool, int, bool) {
+// guard is a middleware under test, taken from *Security.
+type guard func(*Security) func(http.Handler) http.Handler
+
+var (
+	activatedGuard guard = func(s *Security) func(http.Handler) http.Handler {
+		return s.RequireActivatedUserForThisEndpoint
+	}
+	authOnlyGuard guard = func(s *Security) func(http.Handler) http.Handler {
+		return s.RequireAuthentication
+	}
+)
+
+// serveWith runs the given guard over a request whose context carries the given
+// user, mirroring what the authenticate middleware does in production. A nil
+// user means authenticate never stored one.
+func serveWith(t *testing.T, g guard, user *data.User) (*httptest.ResponseRecorder, bool, int, bool) {
 	t.Helper()
 
 	var called, gotOK bool
 	var gotID int
 
-	s := NewHandler(nil) // the token guard never touches the session manager
+	s := NewHandler(nil) // the token guards never touch the session manager
 	r := httptest.NewRequest(http.MethodGet, "/api/v1/movements", nil)
 	if user != nil {
 		r = ContextSetUser(r, user)
 	}
 
 	rec := httptest.NewRecorder()
-	s.RequireActivatedUserForThisEndpoint(nextProbe(&called, &gotID, &gotOK)).ServeHTTP(rec, r)
+	g(s)(nextProbe(&called, &gotID, &gotOK)).ServeHTTP(rec, r)
 
 	return rec, called, gotID, gotOK
+}
+
+// serveGuard runs the activation guard, the stricter of the two.
+func serveGuard(t *testing.T, user *data.User) (*httptest.ResponseRecorder, bool, int, bool) {
+	t.Helper()
+	return serveWith(t, activatedGuard, user)
 }
 
 func TestRequireActivatedUser_ActivatedUserPasses(t *testing.T) {
@@ -145,5 +163,95 @@ func TestUserFromContext_AbsentIsNil(t *testing.T) {
 	// "anonymous" (AnonymousUser) — the guard relies on both being rejected.
 	if got := UserFromContext(httptest.NewRequest(http.MethodGet, "/", nil)); got != nil {
 		t.Errorf("UserFromContext on a bare request = %v, want nil", got)
+	}
+}
+
+// --- RequireAuthentication: identity only, no activation check ---------------
+
+func TestRequireAuthentication_ActivatedUserPasses(t *testing.T) {
+	user := &data.User{ID: 42, Email: "john@example.com", Activated: true}
+
+	rec, called, gotID, gotOK := serveWith(t, authOnlyGuard, user)
+
+	if !called {
+		t.Fatal("expected the guard to call the next handler for an activated user")
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", rec.Code)
+	}
+	if !gotOK || gotID != 42 {
+		t.Errorf("downstream user id = (%d, %t), want (42, true)", gotID, gotOK)
+	}
+}
+
+func TestRequireAuthentication_NotActivatedAlsoPasses(t *testing.T) {
+	// This is the whole reason the two guards exist separately: a registered but
+	// never-activated user still holds a valid token, and must be able to log out
+	// and change their password. Only the activation guard turns this into a 403.
+	user := &data.User{ID: 7, Email: "pending@example.com", Activated: false}
+
+	rec, called, gotID, gotOK := serveWith(t, authOnlyGuard, user)
+
+	if !called {
+		t.Fatal("RequireAuthentication must let a non-activated user through")
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", rec.Code)
+	}
+	if !gotOK || gotID != 7 {
+		t.Errorf("downstream user id = (%d, %t), want (7, true)", gotID, gotOK)
+	}
+}
+
+func TestRequireAuthentication_AnonymousRejected(t *testing.T) {
+	rec, called, _, _ := serveWith(t, authOnlyGuard, data.AnonymousUser)
+
+	if called {
+		t.Fatal("the next handler must not run for an anonymous user")
+	}
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", rec.Code)
+	}
+	if body := strings.TrimSpace(rec.Body.String()); body != `{"error":"not authenticated"}` {
+		t.Errorf("body = %q, want %q", body, `{"error":"not authenticated"}`)
+	}
+}
+
+func TestRequireAuthentication_NoUserInContextRejected(t *testing.T) {
+	rec, called, _, _ := serveWith(t, authOnlyGuard, nil)
+
+	if called {
+		t.Fatal("the next handler must not run when no user is in the context")
+	}
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", rec.Code)
+	}
+}
+
+// TestGuards_DifferOnlyOnActivation states the contract between the two guards
+// as a single table: identical for every input except the one case the
+// activation check exists for.
+func TestGuards_DifferOnlyOnActivation(t *testing.T) {
+	tests := []struct {
+		name          string
+		user          *data.User
+		wantAuthOnly  int
+		wantActivated int
+	}{
+		{"no user", nil, http.StatusUnauthorized, http.StatusUnauthorized},
+		{"anonymous", data.AnonymousUser, http.StatusUnauthorized, http.StatusUnauthorized},
+		{"activated", &data.User{ID: 1, Activated: true}, http.StatusOK, http.StatusOK},
+		{"not activated", &data.User{ID: 2, Activated: false}, http.StatusOK, http.StatusForbidden},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if rec, _, _, _ := serveWith(t, authOnlyGuard, tt.user); rec.Code != tt.wantAuthOnly {
+				t.Errorf("RequireAuthentication status = %d, want %d", rec.Code, tt.wantAuthOnly)
+			}
+			if rec, _, _, _ := serveWith(t, activatedGuard, tt.user); rec.Code != tt.wantActivated {
+				t.Errorf("RequireActivatedUserForThisEndpoint status = %d, want %d", rec.Code, tt.wantActivated)
+			}
+		})
 	}
 }
