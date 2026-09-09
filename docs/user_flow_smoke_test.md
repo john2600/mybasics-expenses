@@ -117,7 +117,7 @@ curl -s -b "$CJ" -X PUT "$BASE/incomes/config" \
     "year_month": "2026-07-01T00:00:00Z",
     "amount": 3000000,
     "cut_day": 24,
-    "description": "Ingreso fijo",
+    "description": "Fixed income",
     "created_at": "2026-07-01T00:00:00Z"
   }
 }
@@ -176,7 +176,7 @@ curl -s -b "$CJ" -X POST "$BASE/movements" \
     "category_id": 1,
     "type": "E",
     "amount": 42500,
-    "description": "Mercado de la semana",
+    "description": "Weekly groceries",
     "date": "2026-07-10",
     "hour": "10:30"
   }' | jq .
@@ -192,7 +192,7 @@ curl -s -b "$CJ" -X POST "$BASE/movements" \
     "category": "Alimentacion",
     "type": "E",
     "amount": 42500,
-    "description": "Mercado de la semana",
+    "description": "Weekly groceries",
     "date": "2026-07-10T00:00:00Z",
     "hour": "10:30:00",
     "created_at": "…",
@@ -228,7 +228,7 @@ expenses (the income from step 5 is excluded), and the total across them:
         "category": "Alimentacion",
         "type": "E",
         "amount": 42500,
-        "description": "Mercado de la semana",
+        "description": "Weekly groceries",
         "date": "2026-07-10T00:00:00Z",
         "hour": "10:30:00",
         "created_at": "…",

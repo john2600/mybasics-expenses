@@ -24,7 +24,7 @@ func (app *Application) authenticate(next http.Handler) http.Handler {
 
 		// No header: treat as anonymous and continue.
 		if authorizationHeader == "" {
-			r = app.contextSetUser(r, data.AnonymousUser)
+			r = security.ContextSetUser(r, data.AnonymousUser)
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -54,7 +54,7 @@ func (app *Application) authenticate(next http.Handler) http.Handler {
 			return
 		}
 
-		r = app.contextSetUser(r, user)
+		r = security.ContextSetUser(r, user)
 		next.ServeHTTP(w, r)
 	})
 }

@@ -123,6 +123,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	// Renew the session token on login to prevent session fixation, then store
 	// the authenticated user id. The rest of the app reads it from the session
 	// (via the security middleware), never from the request body.
+	// TODO not apply to the token legacy logic
 	if err := h.sm.RenewToken(r.Context()); err != nil {
 		response.InternalError(w, err)
 		return
@@ -141,5 +142,6 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 		response.InternalError(w, err)
 		return
 	}
+
 	response.Success(w, "logout successful")
 }

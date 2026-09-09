@@ -1,58 +1,59 @@
-# Arquitectura
+# Architecture
 
-MyBasics-Expenses sigue un patrón por capas estricto: **Repository → Service → Handler**.
-Las dependencias fluyen hacia adentro y cada capa define su propia interfaz.
+MyBasics-Expenses follows a strict layered pattern: **Repository → Service → Handler**.
+Dependencies flow inward and every layer defines its own interface.
 
 ```
 HTTP  ─────────────►  Handler  ─────►  Service  ─────►  Repository  ─────►  MySQL
 (chi router)          (handler.go)     (service.go)     (repository.go)
         ▲                  │                │                  │
-     JSON Envelope    decodifica       valida reglas      SQL directo
-   (pkg/response)     request/response  de negocio        (database/sql)
+     JSON Envelope     decodes          validates          direct SQL
+   (pkg/response)     request/response  business rules     (database/sql)
 ```
 
-## Capas
+## Layers
 
-| Capa | Archivo | Responsabilidad |
+| Layer | File | Responsibility |
 |---|---|---|
-| **Handler** | `handler.go` | Capa HTTP con chi. Decodifica la petición, llama al servicio y responde con los helpers de `pkg/response`. |
-| **Service** | `service.go` | Lógica de negocio y validación. Depende de una **interfaz** de repositorio (permite mocks en tests). |
-| **Repository** | `repository.go` | Acceso a datos con SQL directo (`database/sql`). Recibe `*sql.DB`, devuelve modelos de dominio. |
+| **Handler** | `handler.go` | HTTP layer with chi. Decodes the request, calls the service and responds through the `pkg/response` helpers. |
+| **Service** | `service.go` | Business logic and validation. Depends on a repository **interface** (enables mocks in tests). |
+| **Repository** | `repository.go` | Data access with direct SQL (`database/sql`). Takes a `*sql.DB`, returns domain models. |
 
-El wiring (crear repos → services → handlers y registrar rutas) ocurre en
+The wiring (create repos → services → handlers and register routes) happens in
 `cmd/api/main.go`.
 
-## Modelo de datos
+## Data model
 
-Tres tablas (ver `migrations/001_init.sql`):
+Three tables (see `migrations/000001_init.up.sql`):
 
-- **`categories`** — catálogo de categorías (nombre único, color para UI).
-- **`movements`** — cada ingreso (`type='I'`) o gasto (`type='E'`). FK a `categories`.
-  Es la **única fuente de verdad** financiera.
-- **`income_config_history`** — configuración de ingreso fijo mensual, **versionada**:
-  cada fila vale desde su `year_month` en adelante hasta que exista una más reciente.
+- **`categories`** — catalog of categories (unique name, color for the UI).
+- **`movements`** — each income (`type='I'`) or expense (`type='E'`). FK to `categories`.
+  This is the **single source of truth** for financial data.
+- **`income_config_history`** — fixed monthly income config, **versioned**: each row
+  is valid from its `year_month` onward until a newer one exists.
 
 ```
 categories 1 ────< movements     (fk_movements_category)
-income_config_history  (independiente, consultada por balance)
+income_config_history  (independent, queried by balance)
 ```
 
-`balance`, `reports` y `analytics` no tienen tablas propias: leen de `movements`
-(y `balance` combina con `income_config_history` a través del módulo `incomes`).
+`balance`, `reports` and `analytics` have no tables of their own: they read from
+`movements` (and `balance` combines it with `income_config_history` through the
+`incomes` module).
 
-## Convenciones clave
+## Key conventions
 
-- **Respuestas**: siempre `Envelope{Data, Error, Message}` vía `pkg/response`. Nunca JSON crudo.
-- **Errores**: cada módulo define `ErrNotFound` en `errors.go`; el servicio lo retorna y el handler lo traduce a `404`.
-- **Tests**: solo unit tests de la capa de servicio, con mocks inline que implementan la interfaz del repositorio. Viven junto al código (`service_test.go`).
-- **Pool de conexiones**: configurado en `internal/platform/database/mysql.go` (`MaxOpenConns=25`, `MaxIdleConns=10`).
+- **Responses**: always `Envelope{Data, Error, Message}` via `pkg/response`. Never raw JSON.
+- **Errors**: each module defines `ErrNotFound` in `errors.go`; the service returns it and the handler translates it into a `404`.
+- **Tests**: service-layer unit tests only, with inline mocks that implement the repository interface. They live next to the code (`service_test.go`).
+- **Connection pool**: configured in `internal/platform/database/mysql.go` (`MaxOpenConns=25`, `MaxIdleConns=10`).
 
-## Diferencias con el proyecto base (MyExpenses)
+## Differences from the base project (MyExpenses)
 
-Este proyecto es una réplica simplificada. Se **eliminó** toda la capa de ingesta
-automática de correos:
+This project is a simplified replica. The whole automatic email ingestion layer
+was **removed**:
 
-- Módulos removidos: `ingestion` (orquestador), `mail` (cliente IMAP).
-- Módulo `expense` (legacy, sin tabla) removido; `movements` es el modelo único.
-- La tabla `movements` ya no tiene los campos `mail_uid` / `mail_message_id`.
-- El esquema se consolidó en un único `001_init.sql` definitivo (sin datos de ejemplo).
+- Removed modules: `ingestion` (orchestrator), `mail` (IMAP client).
+- The `expense` module (legacy, no table) was removed; `movements` is the single model.
+- The `movements` table no longer has the `mail_uid` / `mail_message_id` fields.
+- The schema was consolidated into a single definitive init migration (no sample data).

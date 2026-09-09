@@ -1,17 +1,17 @@
-# Documentación — MyBasics-Expenses
+# Documentation — MyBasics-Expenses
 
-| Documento | Contenido |
+| Document | Contents |
 |---|---|
-| [../README.md](../README.md) | Puesta en marcha, endpoints y ejemplos con curl |
-| [../CLAUDE.md](../CLAUDE.md) | Guía para trabajar el repo (comandos, módulos, convenciones) |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Patrón por capas, modelo de datos y convenciones |
-| [EMAIL_SENDER.md](EMAIL_SENDER.md) | Envío de correos por SMTP (Mailtrap sandbox), configuración y Docker |
-| [../DOCKER.md](../DOCKER.md) | Uso de Docker Compose (servicios, puertos, variables) |
-| [../ROADMAP.md](../ROADMAP.md) | Estado actual e ideas a futuro |
+| [../README.md](../README.md) | Getting started, endpoints and curl examples |
+| [../CLAUDE.md](../CLAUDE.md) | Guide for working on the repo (commands, modules, conventions) |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Layered pattern, data model and conventions |
+| [EMAIL_SENDER.md](EMAIL_SENDER.md) | Sending email over SMTP (Mailtrap sandbox), configuration and Docker |
+| [../DOCKER.md](../DOCKER.md) | Using Docker Compose (services, ports, variables) |
+| [../ROADMAP.md](../ROADMAP.md) | Current state and future ideas |
 
-## Documentación generada
+## Generated documentation
 
-El proyecto incluye skills para generar documentación más extensa:
+The project includes skills for generating more extensive documentation:
 
-- `generate-docs` — documentación técnica completa (APIs, arquitectura, instalación).
-- `generate-user-manual` — manual de usuario final (flujos, glosario, FAQ).
+- `generate-docs` — full technical documentation (APIs, architecture, installation).
+- `generate-user-manual` — end-user manual (flows, glossary, FAQ).
