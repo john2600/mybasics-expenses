@@ -8,4 +8,4 @@
 # covered those statements should come back instead.
 #
 # package                minimum %
-internal/movement        16
+internal/movement        85
