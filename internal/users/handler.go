@@ -32,8 +32,10 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Get("/user/activate", h.activate)
 }
 
-// RegisterProtectedRoutes registers user routes that require an active session.
-// Mount this inside the authenticated group.
+// RegisterProtectedRoutes registers user routes that require an authenticated
+// user but not an activated account: someone who registered and never followed
+// the activation link must still be able to change their password and log out.
+// Mount this inside the RequireAuthentication group.
 func (h *Handler) RegisterProtectedRoutes(r chi.Router) {
 	r.Post("/change_password", h.updatePassword)
 	r.Post("/user/logout", h.logout)
