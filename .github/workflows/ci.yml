@@ -73,8 +73,8 @@ jobs:
       - name: Test
         run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
 
-      # Print the total coverage in the job log. No threshold is enforced for
-      # now — this is reporting only, it never fails the pipeline.
+      # Print the repo-wide total in the job log. This step is reporting only;
+      # what can fail the pipeline is the per-package gate at the end.
       - name: Coverage summary
         run: go tool cover -func=coverage.out | tail -1
 
@@ -83,8 +83,7 @@ jobs:
         run: go tool cover -html=coverage.out -o coverage.html
 
       # Keep the raw profile and the HTML downloadable from the run page for
-      # inspection. Deploys/gates nothing — the natural hook for a coverage gate
-      # or badge later. Safe to drop.
+      # inspection — this is what you open when the gate below rejects a run.
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
@@ -97,13 +96,26 @@ jobs:
       # Push the profile to Codecov for PR comments and trend graphs. Tokenless
       # works for public repos; for a private repo add a CODECOV_TOKEN secret and
       # uncomment `token` below. `fail_ci_if_error: false` keeps a flaky upload
-      # from breaking the pipeline — coverage reporting must not gate CI (yet).
+      # from breaking the pipeline: enforcement is the gate's job, not the
+      # uploader's, so a Codecov outage must never fail a run on its own.
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           files: coverage.out
           fail_ci_if_error: false
           # token: ${{ secrets.CODECOV_TOKEN }}
+
+      # The gate runs last on purpose: a failing step stops the ones after it,
+      # so putting this below the uploads keeps the report and the Codecov data
+      # available precisely on the runs where coverage dropped and you need to
+      # look at them.
+      #
+      # Thresholds live in coverage-thresholds.txt, one line per package. It is
+      # an allow-list — only the packages named there are enforced, so a new
+      # package never breaks CI on its first day, and putting one under the gate
+      # is a deliberate commit.
+      - name: Coverage gate
+        run: ./scripts/coverage-gate.sh
 
   build:
     name: Build

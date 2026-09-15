@@ -1,0 +1,11 @@
+# Minimum statement coverage per package, enforced by scripts/coverage-gate.sh.
+#
+# This is an allow-list: only the packages named here are measured, so bringing
+# one under the gate is a deliberate step. Everything else is unmeasured for now.
+#
+# Raise a number only together with the tests that earn it. Lowering one is not
+# a way to make CI pass — it means coverage regressed, and the tests that
+# covered those statements should come back instead.
+#
+# package                minimum %
+internal/movement        16
