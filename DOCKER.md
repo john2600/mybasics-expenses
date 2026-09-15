@@ -41,6 +41,21 @@ They are configured in `docker-compose.yml` under `environment`. Default values:
 
 > There is no mail/IMAP configuration: this project does not ingest emails.
 
+## Changing the published ports
+
+The host ports are overridable, so this stack can run next to another project
+that already occupies 3308 or 8081. Set them in `.env` (git-ignored) rather than
+editing `docker-compose.yml`:
+
+```bash
+DB_HOST_PORT=3309
+API_HOST_PORT=8082
+```
+
+Only what the host exposes changes; the container ports (3306 and 8081) and
+everything inside the compose network stay the same. Without a `.env`, the
+defaults in the table above apply.
+
 ## Connect to the database
 
 ```bash
