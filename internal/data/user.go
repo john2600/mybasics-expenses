@@ -28,7 +28,6 @@ type User struct {
 	Activated      bool     `json:"activated"`
 	Password       Password `json:"-"`
 	HashedPassword []byte
-	version        int `json:"-"`
 }
 
 // LoginRequest is the payload for authenticating an existing user.
@@ -37,9 +36,10 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
+// Password wraps a stored bcrypt hash. It deliberately holds no plaintext: the
+// only operation is comparing a candidate against the hash.
 type Password struct {
-	plaintext *string
-	hash      []byte
+	hash []byte
 }
 
 // NewPassword wraps an existing bcrypt hash into a Password. Callers outside this

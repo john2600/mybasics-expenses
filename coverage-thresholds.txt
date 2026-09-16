@@ -1,0 +1,37 @@
+# Minimum statement coverage per package, enforced by scripts/coverage-gate.sh.
+#
+# This is an allow-list: only the packages named here are measured, so bringing
+# one under the gate is a deliberate step. Everything else is unmeasured.
+#
+# Raise a number only together with the tests that earn it. Lowering one is not
+# a way to make CI pass — it means coverage regressed, and the tests that
+# covered those statements should come back instead.
+#
+# package                        minimum %
+pkg/response                     90
+internal/data                    90
+internal/category                90
+internal/incomes                 90
+internal/movement                90
+internal/balance                 90
+internal/reports                 90
+internal/analytics               90
+internal/security                90
+internal/users                   90
+internal/mailer                  90
+
+# Below 90 on purpose — the uncovered statements need live infrastructure, not
+# more tests:
+#
+#   platform/database: the success path of NewMySQL returns only after a real
+#   Ping, so it needs a running MySQL. Both error paths are covered.
+#
+#   cmd/api: main() and most of run() bind a port and block in
+#   ListenAndServe, and NewApp cannot get past initDataBase without a database.
+#   Everything reachable without infrastructure — the wiring, authenticate,
+#   healthCheck, CORS and the route protection matrix — is covered.
+#
+# Raise these two if the code is ever refactored to take an injected pool or a
+# listener.
+internal/platform/database       80
+cmd/api                          74
