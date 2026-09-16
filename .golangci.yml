@@ -1,16 +1,15 @@
-# golangci-lint configuration (v2 schema — required by golangci-lint-action v7).
+# golangci-lint configuration (v2 schema — required by golangci-lint-action v9).
 version: "2"
 
 linters:
-  # Keep the default (standard) linter set, but temporarily turn off `unused`.
+  # Keep the default (standard) linter set, but turn off `unused`.
   #
-  # Several token-auth pieces are already written but not wired into the router
-  # yet: the `authenticate` middleware (cmd/api/middleware.go), the request-context
-  # helpers (cmd/api/context.go), and a couple of forward-looking fields on
-  # data.User (version, plaintext). They are intentionally dead code until the
-  # auth flow is connected.
+  # Most of what this used to cover is gone: the `authenticate` middleware is
+  # wired into the router, and cmd/api/context.go was removed. What remains are
+  # two forward-looking fields on data.User — `version` (for optimistic locking)
+  # and Password.plaintext — which are written but not read yet.
   #
-  # TODO: remove this disable (re-enable `unused`) once the auth middleware is
-  # wired into the router.
+  # Re-enabling `unused` today reports exactly those two and nothing else, so
+  # the next step is to either use them or delete them, then drop this disable.
   disable:
     - unused
