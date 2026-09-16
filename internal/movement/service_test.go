@@ -338,3 +338,38 @@ func TestListExpenses_RepoError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 }
+
+func TestGetMovement_DelegatesScopedToTheUser(t *testing.T) {
+	repo := &mockRepository{movements: []movement.Movement{{ID: 7, Amount: 100}}}
+	svc := movement.NewService(repo)
+
+	got, err := svc.GetMovement(context.Background(), 42, 7)
+	if err != nil {
+		t.Fatalf("GetMovement returned error: %v", err)
+	}
+	if got == nil || got.ID != 7 {
+		t.Fatalf("got = %v, want the movement with id 7", got)
+	}
+}
+
+func TestGetMovement_MissingIsNilWithoutError(t *testing.T) {
+	// The handler turns a nil movement into a 404, so the service must not
+	// invent an error for a row that simply does not exist.
+	svc := movement.NewService(&mockRepository{})
+
+	got, err := svc.GetMovement(context.Background(), 42, 999)
+	if err != nil {
+		t.Errorf("err = %v, want nil", err)
+	}
+	if got != nil {
+		t.Errorf("got = %v, want nil", got)
+	}
+}
+
+func TestGetMovement_PropagatesRepositoryError(t *testing.T) {
+	svc := movement.NewService(&mockRepository{err: errors.New("db down")})
+
+	if _, err := svc.GetMovement(context.Background(), 42, 7); err == nil {
+		t.Error("expected the repository error to propagate")
+	}
+}
