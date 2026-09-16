@@ -1,15 +1,6 @@
 # golangci-lint configuration (v2 schema — required by golangci-lint-action v9).
+#
+# The default (standard) linter set, with nothing disabled. `unused` used to be
+# turned off for forward-looking code that was written before it was wired up;
+# that code is now either in use or deleted, so the linter runs in full.
 version: "2"
-
-linters:
-  # Keep the default (standard) linter set, but turn off `unused`.
-  #
-  # Most of what this used to cover is gone: the `authenticate` middleware is
-  # wired into the router, and cmd/api/context.go was removed. What remains are
-  # two forward-looking fields on data.User — `version` (for optimistic locking)
-  # and Password.plaintext — which are written but not read yet.
-  #
-  # Re-enabling `unused` today reports exactly those two and nothing else, so
-  # the next step is to either use them or delete them, then drop this disable.
-  disable:
-    - unused
